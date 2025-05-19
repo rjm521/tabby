@@ -1,5 +1,5 @@
 <div align="center">
-  
+
 # 🐾 Tabby
 
 [📚 Docs](https://tabby.tabbyml.com/docs/welcome/) • [💬 Slack](https://links.tabbyml.com/join-slack) • [🗺️ Roadmap](https://tabby.tabbyml.com/docs/roadmap/)
@@ -42,12 +42,12 @@ Tabby is a self-hosted AI coding assistant, offering an open-source and on-premi
 * **12/24/2024** Introduce **Notification Box** in Tabby [v0.22.0](https://github.com/TabbyML/tabby/releases/tag/v0.22.0)!
 * **12/06/2024** Llamafile deployment integration and enhanced Answer Engine user experience are coming in Tabby [v0.21.0](https://github.com/TabbyML/tabby/releases/tag/v0.21.0)!🚀
 * **11/10/2024** Switching between different backend chat models is supported in Answer Engine with Tabby [v0.20.0](https://github.com/TabbyML/tabby/releases/tag/v0.20.0)!
-* **10/30/2024** Tabby [v0.19.0](https://github.com/TabbyML/tabby/releases/tag/v0.19.0) featuring recent shared threads on the main page to improve their discoverability. 
+* **10/30/2024** Tabby [v0.19.0](https://github.com/TabbyML/tabby/releases/tag/v0.19.0) featuring recent shared threads on the main page to improve their discoverability.
 * **07/09/2024** 🎉Announce [Codestral integration in Tabby](https://tabby.tabbyml.com/blog/2024/07/09/tabby-codestral/)!
 * **07/05/2024** Tabby [v0.13.0](https://github.com/TabbyML/tabby/releases/tag/v0.13.0) introduces ***Answer Engine***, a central knowledge engine for internal engineering teams. It seamlessly integrates with dev team's internal data, delivering reliable and precise answers to empower developers.
 * **06/13/2024** [VSCode 1.7](https://marketplace.visualstudio.com/items/TabbyML.vscode-tabby/changelog) marks a significant milestone with a versatile Chat experience throughout your coding experience. Come and they the latest **chat in side-panel** and **editing via chat command**!
 * **06/10/2024** Latest 📃blogpost drop on [an enhanced code context understanding](https://tabby.tabbyml.com/blog/2024/06/11/rank-fusion-in-tabby-code-completion/) in Tabby!
-* **06/06/2024** Tabby [v0.12.0](https://github.com/TabbyML/tabby/releases/tag/v0.12.0) release brings 🔗**seamless integrations** (Gitlab SSO, Self-hosted GitHub/GitLab, etc.), to ⚙️**flexible configurations** (HTTP API integration) and 🌐**expanded capabilities** (repo-context in Code Browser)! 
+* **06/06/2024** Tabby [v0.12.0](https://github.com/TabbyML/tabby/releases/tag/v0.12.0) release brings 🔗**seamless integrations** (Gitlab SSO, Self-hosted GitHub/GitLab, etc.), to ⚙️**flexible configurations** (HTTP API integration) and 🌐**expanded capabilities** (repo-context in Code Browser)!
 * **05/22/2024** Tabby [VSCode 1.6](https://marketplace.visualstudio.com/items?itemName=TabbyML.vscode-tabby) comes with **multiple choices** in inline completion, and the **auto-generated commit messages**🐱💻!
 * **05/11/2024** [v0.11.0](https://github.com/TabbyML/tabby/releases/tag/v0.11.0) brings significant enterprise upgrades, including 📊**storage usage** stats, 🔗**GitHub & GitLab** integration, 📋**Activities** page, and the long-awaited 🤖**Ask Tabby** feature!
 * **04/22/2024** [v0.10.0](https://github.com/TabbyML/tabby/releases/tag/v0.10.0) released, featuring the latest **Reports** tab with team-wise analytics for Tabby usage.
@@ -124,8 +124,8 @@ apt install make sqlite3 graphviz
 ... and don't forget to submit a [Pull Request](https://github.com/TabbyML/tabby/compare)
 
 ## 🌍 Community
-- 🎤 [Twitter / X](https://twitter.com/Tabby_ML) - engage with TabbyML for all things possible 
-- 📚 [LinkedIn](https://www.linkedin.com/company/tabbyml/) - follow for the latest from the community 
+- 🎤 [Twitter / X](https://twitter.com/Tabby_ML) - engage with TabbyML for all things possible
+- 📚 [LinkedIn](https://www.linkedin.com/company/tabbyml/) - follow for the latest from the community
 - 💌 [Newsletter](https://newsletter.tabbyml.com/archive) - subscribe to unlock Tabby insights and secrets
 
 ### 🔆 Activity
@@ -135,3 +135,18 @@ apt install make sqlite3 graphviz
 ### 🌟 Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=tabbyml/tabby&type=Date)](https://star-history.com/#tabbyml/tabby&Date)
+
+## 项目目录介绍
+
+- **website/**: 存放网站相关代码和资源。
+- **python/**: 存放Python相关的代码和脚本。
+- **rules/**: 存放项目规则和配置文件。
+- **experimental/**: 存放实验性代码和功能。
+- **ee/**: 存放企业版相关代码和功能。
+- **docker/**: 存放Docker相关配置和脚本。
+- **crates/**: 存放Rust相关的代码和库。
+- **clients/**: 存放客户端相关代码和功能。
+- **ci/**: 存放持续集成相关的配置和脚本。
+- **.github/**: 存放GitHub相关的配置和脚本。
+- **.changes/**: 存放变更记录和日志。
+- **.tmuxinator/**: 存放Tmuxinator相关的配置和脚本。
