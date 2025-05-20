@@ -1,0 +1,230 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tabby Makefile 命令使用说明
+
+## 基础构建命令
+
+### 构建命令
+- `make build` - 构建所有目标（发布模式）
+  ```bash
+  # 构建所有目标，使用发布模式优化
+  make build
+  ```
+
+- `make build-tabby` - 构建 tabby 主程序
+  ```bash
+  # 仅构建 tabby 主程序
+  make build-tabby
+  ```
+
+- `make build-index-cli` - 构建 tabby-index-cli
+  ```bash
+  # 仅构建 tabby-index-cli 工具
+  make build-index-cli
+  ```
+
+- `make dev-build` - 开发模式构建（不优化）
+  ```bash
+  # 开发模式构建，不进行优化，便于调试
+  make dev-build
+  ```
+
+## 测试相关命令
+
+### 测试命令
+- `make test` - 运行所有测试
+  ```bash
+  # 运行项目中的所有测试
+  make test
+  ```
+
+- `make test-tabby` - 运行 tabby 测试
+  ```bash
+  # 仅运行 tabby 主程序的测试
+  make test-tabby
+  ```
+
+- `make test-index-cli` - 运行 tabby-index-cli 测试
+  ```bash
+  # 仅运行 tabby-index-cli 的测试
+  make test-index-cli
+  ```
+
+## 代码质量相关命令
+
+### 代码格式化
+- `make fmt` - 格式化所有代码
+  ```bash
+  # 格式化所有 Rust 代码
+  make fmt
+  ```
+
+- `make fmt-check` - 检查代码格式
+  ```bash
+  # 检查代码格式，不进行修改
+  make fmt-check
+  ```
+
+### 代码检查
+- `make clippy` - 运行 clippy 检查
+  ```bash
+  # 运行 clippy 代码检查
+  make clippy
+  ```
+
+## 维护相关命令
+
+### 清理和更新
+- `make clean` - 清理构建文件
+  ```bash
+  # 清理所有构建产物
+  make clean
+  ```
+
+- `make update` - 更新依赖
+  ```bash
+  # 更新项目依赖
+  make update
+  ```
+
+- `make install` - 安装依赖
+  ```bash
+  # 安装项目依赖
+  make install
+  ```
+
+## 运行相关命令
+
+### 运行程序
+- `make run` - 运行 tabby 服务器
+  ```bash
+  # 以发布模式运行 tabby 服务器
+  make run
+  ```
+
+- `make run-index-cli` - 运行 tabby-index-cli
+  ```bash
+  # 以发布模式运行 tabby-index-cli
+  make run-index-cli
+  ```
+
+## 开发工具命令
+
+### 代码修复
+- `make fix` - 自动修复代码问题
+  ```bash
+  # 运行 cargo machete 修复依赖问题
+  # 使用 nightly 工具链格式化代码
+  # 运行 clippy 自动修复
+  make fix
+  ```
+
+### UI 相关
+- `make fix-ui` - 修复 UI 代码
+  ```bash
+  # 使用 pnpm 修复 UI 代码格式
+  make fix-ui
+  ```
+
+- `make update-ui` - 更新 UI 文件
+  ```bash
+  # 构建 UI 并更新到 webserver
+  make update-ui
+  ```
+
+### 数据库相关
+- `make update-db-schema` - 更新数据库模式
+  ```bash
+  # 更新 SQLite 数据库模式
+  # 生成 schema.sql 和 schema.svg
+  make update-db-schema
+  ```
+
+### 开发环境
+- `make dev` - 启动开发环境
+  ```bash
+  # 使用 tmuxinator 启动开发环境
+  make dev
+  ```
+
+## 版本管理命令
+
+### 版本更新
+- `make bump-version` - 更新版本号
+  ```bash
+  # 更新所有工作空间包的版本
+  make bump-version
+  ```
+
+- `make bump-release-version` - 更新发布版本
+  ```bash
+  # 更新发布分支的版本号
+  make bump-release-version
+  ```
+
+## 文档更新命令
+
+### API 文档
+- `make update-openapi-doc` - 更新 OpenAPI 文档
+  ```bash
+  # 从本地服务器获取并更新 OpenAPI 文档
+  make update-openapi-doc
+  ```
+
+- `make update-graphql-schema` - 更新 GraphQL schema
+  ```bash
+  # 更新 GraphQL schema 定义
+  make update-graphql-schema
+  ```
+
+## CI 相关命令
+
+### 持续集成
+- `make ci` - 运行 CI 检查
+  ```bash
+  # 运行完整的 CI 检查（格式、clippy、测试）
+  make ci
+  ```
+
+## 帮助信息
+
+### 查看帮助
+- `make help` - 显示帮助信息
+  ```bash
+  # 显示所有可用命令的帮助信息
+  make help
+  ```
+
+## 使用建议
+
+1. 开发新功能时：
+   ```bash
+   make dev-build  # 开发模式构建
+   make test       # 运行测试
+   make fmt        # 格式化代码
+   make clippy     # 代码检查
+   ```
+
+2. 准备提交代码时：
+   ```bash
+   make fix        # 自动修复代码问题
+   make test       # 运行测试
+   make ci         # 运行完整检查
+   ```
+
+3. 更新依赖时：
+   ```bash
+   make update     # 更新依赖
+   make test       # 确保更新后测试通过
+   ```
+
+4. 发布新版本时：
+   ```bash
+   make clean      # 清理旧的构建文件
+   make build      # 构建发布版本
+   make test       # 运行测试
+   make bump-version  # 更新版本号
+   ```

@@ -1,14 +1,14 @@
 import type { ConfigData } from "./type";
-import fixSpellingAndGrammarPrompt from "../chat/prompts/fix-spelling-and-grammar.md";
-import generateCommitMessagePrompt from "../chat/prompts/generate-commit-message.md";
-import generateDocsPrompt from "../chat/prompts/generate-docs.md";
-import editCommandReplacePrompt from "../chat/prompts/edit-command-replace.md";
-import editCommandInsertPrompt from "../chat/prompts/edit-command-insert.md";
-import generateSmartApplyPrompt from "../chat/prompts/generate-smart-apply.md";
-import provideSmartApplyLineRangePrompt from "../chat/prompts/provide-smart-apply-line-range.md";
-import includeFileContextList from "../chat/prompts/include-file-context-list.md";
-import includeFileContextItem from "../chat/prompts/include-file-context-item.md";
-import generateBranchNamePrompt from "../chat/prompts/generate-branch-name.md";
+import fixSpellingAndGrammarPrompt from "docs/all/docs/all/../chat/prompts/fix-spelling-and-grammar.md";
+import generateCommitMessagePrompt from "docs/all/docs/all/../chat/prompts/generate-commit-message.md";
+import generateDocsPrompt from "docs/all/docs/all/../chat/prompts/generate-docs.md";
+import editCommandReplacePrompt from "docs/all/docs/all/../chat/prompts/edit-command-replace.md";
+import editCommandInsertPrompt from "docs/all/docs/all/../chat/prompts/edit-command-insert.md";
+import generateSmartApplyPrompt from "docs/all/docs/all/../chat/prompts/generate-smart-apply.md";
+import provideSmartApplyLineRangePrompt from "docs/all/docs/all/../chat/prompts/provide-smart-apply-line-range.md";
+import includeFileContextList from "docs/all/docs/all/../chat/prompts/include-file-context-list.md";
+import includeFileContextItem from "docs/all/docs/all/../chat/prompts/include-file-context-item.md";
+import generateBranchNamePrompt from "docs/all/docs/all/../chat/prompts/generate-branch-name.md";
 export const defaultConfigData: ConfigData = {
   server: {
     endpoint: "http://localhost:8080",
