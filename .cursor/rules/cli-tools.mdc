@@ -1,0 +1,79 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tabby CLI Tools
+
+## tabby-index-cli
+
+用于管理和操作 Tabby 索引的命令行工具。
+
+### 全局参数
+- `-i, --index-dir`: 指定索引目录的路径（可选，默认使用 `~/.tabby/index`）
+
+### 可用命令
+
+#### 1. Inspect
+检查索引的详细信息。
+```bash
+tabby-index-cli inspect
+```
+
+#### 2. Head
+查看索引中的文档内容。
+```bash
+tabby-index-cli head -n <num_docs> -c <corpus>
+```
+参数：
+- `-n, --num-docs`: 要显示的文档数量（默认值：1）
+- `-c, --corpus`: 要查询的语料库（默认值："code"）
+
+#### 3. Bench
+对索引进行性能基准测试。
+```bash
+tabby-index-cli bench -q <queries_file> -n <num_repeat>
+```
+参数：
+- `-q, --queries`: 查询文件路径（必需）
+- `-n, --num-repeat`: 重复测试的次数（默认值：1）
+
+#### 4. Create
+创建新的索引。
+```bash
+tabby-index-cli create -s <source> [-n <name>] [-l <language>] [-m <max_file_size>] [-e <exclude>] [-i <include>]
+```
+参数：
+- `-s, --source`: 源代码路径（本地目录或git仓库URL）
+- `-n, --name`: 索引名称（可选）
+- `-l, --language`: 代码语言（支持多语言，用逗号分隔，可选）
+- `-m, --max-file-size`: 单个文件最大大小（MB，默认值：10）
+- `-e, --exclude`: 排除的文件/目录模式（支持glob，可选）
+- `-i, --include`: 包含的文件/目录模式（支持glob，可选）
+
+## tabby
+
+主程序命令行工具。
+
+### 可用命令
+
+#### 1. Serve
+启动 API 服务器。
+```bash
+tabby serve [options]
+```
+主要选项：
+- `--model`: 用于 `/completions` API 的模型 ID
+- `--chat-model`: 用于 `/chat/completions` API 的模型 ID
+- `--host`: 服务器主机地址（默认：0.0.0.0）
+- `--port`: 服务器端口（默认：8080）
+- `--device`: 运行模型推理的设备（默认：cpu）
+
+#### 2. Download
+下载语言模型。
+```bash
+tabby download --model <model_id>
+```
+参数：
+- `--model`: 要下载的模型 ID
+- `--prefer-local-file`: 如果为 true，跳过检查远程模型文件

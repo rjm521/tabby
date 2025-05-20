@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tabby Project Structure
+
+## Core Components
+
+### Main Application
+- [tabby/src/main.rs](mdc:crates/tabby/src/main.rs) - 主程序入口点
+- [tabby/src/serve.rs](mdc:crates/tabby/src/serve.rs) - API 服务器实现
+- [tabby-common/src/lib.rs](mdc:crates/tabby-common/src/lib.rs) - 通用类型和工具
+
+### Indexing System
+- [tabby-index-cli/src/main.rs](mdc:crates/tabby-index-cli/src/main.rs) - 索引命令行工具
+- [tabby-index-cli/src/commands/mod.rs](mdc:crates/tabby-index-cli/src/commands/mod.rs) - 索引命令实现
+
+### Enterprise Features
+- [tabby-webserver/src/lib.rs](mdc:ee/tabby-webserver/src/lib.rs) - 企业版 Web 服务器
+- [tabby-webserver/src/routes/mod.rs](mdc:ee/tabby-webserver/src/routes/mod.rs) - API 路由定义
+
+## Key Directories
+- `crates/` - 核心功能模块
+- `ee/` - 企业版功能
+- `website/` - 项目网站和文档

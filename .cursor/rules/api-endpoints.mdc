@@ -1,0 +1,44 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tabby API Endpoints
+
+## V1 API Endpoints
+
+### Chat API
+- `POST /v1/chat/completions` - 聊天补全接口
+  - 实现：[tabby/src/routes/chat.rs](mdc:crates/tabby/src/routes/chat.rs)
+
+### Completion API
+- `POST /v1/completions` - 代码补全接口
+  - 实现：[tabby/src/routes/completions.rs](mdc:crates/tabby/src/routes/completions.rs)
+
+### Event API
+- `POST /v1/events` - 事件日志接口
+  - 实现：[tabby/src/routes/events.rs](mdc:crates/tabby/src/routes/events.rs)
+
+### Health API
+- `GET /v1/health` - 健康状态检查接口
+  - 实现：[tabby/src/routes/health.rs](mdc:crates/tabby/src/routes/health.rs)
+
+## V1beta API Endpoints
+
+### Model API
+- `GET /v1beta/models` - 获取模型信息
+  - 实现：[tabby/src/routes/models.rs](mdc:crates/tabby/src/routes/models.rs)
+
+### Server Settings API
+- `GET /v1beta/server_setting` - 获取服务器设置
+  - 实现：[tabby/src/routes/server_setting.rs](mdc:crates/tabby/src/routes/server_setting.rs)
+
+### Ingestion API
+- `POST /v1beta/ingestion` - 数据摄取接口
+- `DELETE /v1beta/ingestion/{source}` - 删除指定来源的摄取数据
+- `DELETE /v1beta/ingestion/{source}/{id}` - 删除特定的摄取数据
+  - 实现：[tabby-webserver/src/routes/ingestion.rs](mdc:ee/tabby-webserver/src/routes/ingestion.rs)
+
+## Repository API
+- `GET /repositories/{kind}/{id}/resolve/{path}` - 获取本地仓库中的文件或目录内容
+  - 实现：[tabby-webserver/src/routes/repositories.rs](mdc:ee/tabby-webserver/src/routes/repositories.rs)
