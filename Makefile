@@ -82,7 +82,7 @@ install:
 # 运行 tabby 服务器
 .PHONY: run
 run:
-	$(CARGO) run --release -- serve
+	$(CARGO) run --release --bin tabby serve
 
 # 运行 tabby-index-cli
 .PHONY: run-index-cli

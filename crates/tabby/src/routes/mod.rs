@@ -58,6 +58,7 @@ mod events;
 mod health;
 mod models;
 mod server_setting;
+pub mod index;
 
 pub use chat::*;
 pub use completions::*;
@@ -65,3 +66,4 @@ pub use events::*;
 pub use health::*;
 pub use models::*;
 pub use server_setting::*;
+pub use index::*;

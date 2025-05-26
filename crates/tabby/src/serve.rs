@@ -60,6 +60,9 @@ Install following IDE / Editor extensions to get started with [Tabby](https://gi
         routes::chat_completions_utoipa,
         routes::health,
         routes::setting,
+        routes::index::get_index_info,
+        routes::index::get_documents,
+        routes::index::create_index,
     ),
     components(schemas(
         api::event::LogEventRequest,
@@ -75,6 +78,9 @@ Install following IDE / Editor extensions to get started with [Tabby](https://gi
         health::HealthState,
         health::Version,
         api::server_setting::ServerSetting,
+        routes::index::IndexInfo,
+        routes::index::DocumentInfo,
+        routes::index::CreateIndexRequest,
     )),
     modifiers(&SecurityAddon),
 )]
@@ -268,6 +274,8 @@ async fn api_router(
             .route("/v1beta/models", routing::get(routes::models))
             .with_state(Arc::new(config.clone().into()))
     });
+
+    routers.push(routes::index_router());
 
     if let Some(completion_state) = completion_state {
         let mut router = Router::new()
