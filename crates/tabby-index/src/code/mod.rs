@@ -46,7 +46,7 @@ impl CodeIndexer {
         );
         let commit = repository::sync_repository(repository)?;
 
-        index::index_repository(embedding, repository, &commit).await;
+        index::index_repository_with_progress(embedding, repository, &commit, self.progress_callback.as_ref()).await;
         index::garbage_collection().await;
 
         Ok(())

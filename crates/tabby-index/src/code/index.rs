@@ -27,7 +27,22 @@ pub async fn index_repository(
     repository: &CodeRepository,
     commit: &str,
 ) {
+    index_repository_with_progress(embedding, repository, commit, None).await;
+}
+
+pub async fn index_repository_with_progress(
+    embedding: Arc<dyn Embedding>,
+    repository: &CodeRepository,
+    commit: &str,
+    progress_callback: Option<&Box<dyn Fn(usize, usize, usize) + Send + Sync>>,
+) {
     let total_files = Walk::new(repository.dir()).count();
+
+    // 初始进度回调
+    if let Some(callback) = &progress_callback {
+        callback(total_files, 0, 0);
+    }
+
     let file_stream = stream! {
         for file in Walk::new(repository.dir()) {
             let file = match file {
@@ -50,7 +65,14 @@ pub async fn index_repository(
     let mut count_chunks = 0;
     while let Some(files) = file_stream.next().await {
         count_files += files.len();
-        count_chunks += add_changed_documents(repository, commit, embedding.clone(), files).await;
+        let new_chunks = add_changed_documents(repository, commit, embedding.clone(), files).await;
+        count_chunks += new_chunks;
+
+        // 进度回调
+        if let Some(callback) = &progress_callback {
+            callback(total_files, count_files, count_chunks);
+        }
+
         logkit::info!("Processed {count_files}/{total_files} files, updated {count_chunks} chunks",);
     }
 }

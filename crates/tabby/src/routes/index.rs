@@ -21,6 +21,7 @@ use tantivy::{
     TERMINATED, TantivyDocument, Document,
 };
 use tabby_common::index::IndexSchema;
+use chrono::{Duration, Utc};
 
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -187,6 +188,14 @@ pub struct IndexingProgress {
     progress_percentage: f32,
     /// 当前状态
     status: String,
+    /// 当前正在处理的文件路径
+    current_file: Option<String>,
+    /// 索引开始时间
+    start_time: Option<String>,
+    /// 预估完成时间
+    estimated_completion: Option<String>,
+    /// 处理速度 (文件/秒)
+    processing_rate: Option<f32>,
 }
 
 #[utoipa::path(
@@ -206,12 +215,19 @@ pub async fn create_index(Json(request): Json<CreateIndexRequest>) -> Sse<impl S
     let (tx, rx) = mpsc::channel(100);
 
     tokio::spawn(async move {
+        let start_time = std::time::Instant::now();
+        let start_time_str = chrono::Utc::now().to_rfc3339();
+
         let mut progress = IndexingProgress {
             total_files: 0,
             processed_files: 0,
             updated_chunks: 0,
             progress_percentage: 0.0,
             status: "准备中...".to_string(),
+            current_file: None,
+            start_time: Some(start_time_str.clone()),
+            estimated_completion: None,
+            processing_rate: None,
         };
 
         // 发送初始状态
@@ -220,23 +236,56 @@ pub async fn create_index(Json(request): Json<CreateIndexRequest>) -> Sse<impl S
         let repository = if request.is_remote_zip.unwrap_or(false) {
             // 下载并解压远程zip文件
             progress.status = "下载远程文件...".to_string();
+            progress.current_file = Some(request.source.clone());
             let _ = tx.send(progress.clone()).await;
 
-            let response = reqwest::get(&request.source).await.unwrap();
-            let bytes = response.bytes().await.unwrap();
+            match reqwest::get(&request.source).await {
+                Ok(response) => {
+                    progress.status = "获取文件内容...".to_string();
+                    let _ = tx.send(progress.clone()).await;
 
-            progress.status = "解压文件...".to_string();
-            let _ = tx.send(progress.clone()).await;
+                    match response.bytes().await {
+                        Ok(bytes) => {
+                            progress.status = "解压文件...".to_string();
+                            let _ = tx.send(progress.clone()).await;
 
-            let cursor = Cursor::new(bytes);
-            let mut archive = ZipArchive::new(cursor).unwrap();
-
-            let temp_dir = tempfile::tempdir().unwrap();
-            archive.extract(&temp_dir).unwrap();
-
-            CodeRepository {
-                git_url: temp_dir.path().to_string_lossy().to_string(),
-                source_id: request.name.unwrap_or_else(|| "default".to_string()),
+                            let cursor = Cursor::new(bytes);
+                            match ZipArchive::new(cursor) {
+                                Ok(mut archive) => {
+                                    let temp_dir = tempfile::tempdir().unwrap();
+                                    match archive.extract(&temp_dir) {
+                                        Ok(_) => {
+                                            CodeRepository {
+                                                git_url: temp_dir.path().to_string_lossy().to_string(),
+                                                source_id: request.name.unwrap_or_else(|| "default".to_string()),
+                                            }
+                                        }
+                                        Err(e) => {
+                                            progress.status = format!("解压失败: {}", e);
+                                            let _ = tx.send(progress).await;
+                                            return;
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    progress.status = format!("ZIP文件格式错误: {}", e);
+                                    let _ = tx.send(progress).await;
+                                    return;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            progress.status = format!("下载失败: {}", e);
+                            let _ = tx.send(progress).await;
+                            return;
+                        }
+                    }
+                }
+                Err(e) => {
+                    progress.status = format!("网络请求失败: {}", e);
+                    let _ = tx.send(progress).await;
+                    return;
+                }
             }
         } else {
             CodeRepository {
@@ -246,23 +295,91 @@ pub async fn create_index(Json(request): Json<CreateIndexRequest>) -> Sse<impl S
         };
 
         // 获取 embedding 配置
-        let config = tabby_common::config::Config::load().unwrap().model.embedding;
+        progress.status = "初始化embedding模型...".to_string();
+        progress.current_file = None;
+        let _ = tx.send(progress.clone()).await;
+
+        let config = match tabby_common::config::Config::load() {
+            Ok(config) => config.model.embedding,
+            Err(e) => {
+                progress.status = format!("配置加载失败: {}", e);
+                let _ = tx.send(progress).await;
+                return;
+            }
+        };
+
         let embedding = embedding::create(&config).await;
         let mut indexer = tabby_index::public::CodeIndexer::default();
 
+        // 设置进度回调
+        let tx_clone = tx.clone();
+        let start_time_clone = start_time;
+        let start_time_str_clone = start_time_str.clone();
+        indexer.set_progress_callback(Box::new(move |total_files, processed_files, updated_chunks| {
+            let elapsed = start_time_clone.elapsed().as_secs_f32();
+            let progress_percentage = if total_files > 0 {
+                (processed_files as f32 / total_files as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            let processing_rate = if elapsed > 0.0 {
+                processed_files as f32 / elapsed
+            } else {
+                0.0
+            };
+
+            let estimated_completion = if processing_rate > 0.0 && processed_files < total_files {
+                let remaining_files = total_files - processed_files;
+                let estimated_seconds = remaining_files as f32 / processing_rate;
+                let completion_time = Utc::now() + Duration::seconds(estimated_seconds as i64);
+                Some(completion_time.to_rfc3339())
+            } else {
+                None
+            };
+
+            let status = if processed_files == 0 {
+                "扫描文件中...".to_string()
+            } else if processed_files < total_files {
+                format!("正在索引文件... ({}/{})", processed_files, total_files)
+            } else {
+                "完成文件处理".to_string()
+            };
+
+            let progress = IndexingProgress {
+                total_files,
+                processed_files,
+                updated_chunks,
+                progress_percentage,
+                status,
+                current_file: None,
+                start_time: Some(start_time_str_clone.clone()),
+                estimated_completion,
+                processing_rate: Some(processing_rate),
+            };
+
+            let _ = tx_clone.try_send(progress);
+        }));
+
         // 开始索引
-        progress.status = "正在索引...".to_string();
-        progress.progress_percentage = 50.0;
+        progress.status = "开始建立索引...".to_string();
+        progress.progress_percentage = 0.0;
         let _ = tx.send(progress.clone()).await;
 
         match indexer.refresh(embedding, &repository).await {
             Ok(_) => {
-                progress.status = "索引完成".to_string();
+                let elapsed = start_time.elapsed().as_secs_f32();
+                progress.status = "索引创建完成".to_string();
                 progress.progress_percentage = 100.0;
+                progress.current_file = None;
+                progress.estimated_completion = None;
+                progress.processing_rate = Some(progress.processed_files as f32 / elapsed.max(1.0));
                 let _ = tx.send(progress).await;
             }
             Err(e) => {
-                progress.status = format!("索引失败: {}", e);
+                progress.status = format!("索引创建失败: {}", e);
+                progress.current_file = None;
+                progress.estimated_completion = None;
                 let _ = tx.send(progress).await;
             }
         }
