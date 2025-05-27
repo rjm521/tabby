@@ -26,9 +26,15 @@ mod repository;
 mod types;
 
 #[derive(Default)]
-pub struct CodeIndexer {}
+pub struct CodeIndexer {
+    progress_callback: Option<Box<dyn Fn(usize, usize, usize) + Send + Sync>>,
+}
 
 impl CodeIndexer {
+    pub fn set_progress_callback(&mut self, callback: Box<dyn Fn(usize, usize, usize) + Send + Sync>) {
+        self.progress_callback = Some(callback);
+    }
+
     pub async fn refresh(
         &mut self,
         embedding: Arc<dyn Embedding>,

@@ -1,28 +1,26 @@
 use axum::{
     extract::Path,
-    routing::{get, post},
-    Json, Router,
     response::sse::{Event, Sse},
-    response::IntoResponse,
+    Json, Router,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
-use tabby_common::index::IndexSchema;
-use tantivy::{DocAddress, DocSet, Document, Index, TantivyDocument, Term, TERMINATED};
 use utoipa::ToSchema;
-use http_api_bindings::create_embedding;
-use tabby_common::config::CodeRepository;
-use crate::services::embedding;
-use std::sync::Arc;
-use llama_cpp_server;
 use futures::stream::{self, Stream};
 use std::convert::Infallible;
 use tokio::sync::mpsc;
-use reqwest;
-use std::path::PathBuf;
-use std::io::Write;
-use tempfile::NamedTempFile;
-use zip::ZipArchive;
+use tabby_index;
+use crate::services::embedding;
+use tabby_common::config::CodeRepository;
 use std::io::Cursor;
+use zip::ZipArchive;
+use tantivy::{
+    DocAddress, DocSet,
+    schema::Term,
+    Index,
+    TERMINATED, TantivyDocument, Document,
+};
+use tabby_common::index::IndexSchema;
 
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -39,7 +37,7 @@ pub struct IndexInfo {
 #[serde(rename_all = "camelCase")]
 pub struct DocumentInfo {
     /// 语料库名称
-    #[schema(example = "repo1")] 
+    #[schema(example = "repo1")]
     corpus: String,
     /// 文档内容
     #[schema(example = "{\"file\":\"src/main.rs\",\"content\":\"fn main() {}\"}")]
@@ -160,7 +158,7 @@ pub struct CreateIndexRequest {
     #[schema(example = false)]
     is_remote_zip: Option<bool>,
     /// 索引名称
-    #[schema(example = "tabby-index")] 
+    #[schema(example = "tabby-index")]
     name: Option<String>,
     /// 语言
     #[schema(example = "rust")]
@@ -176,7 +174,7 @@ pub struct CreateIndexRequest {
     include: Vec<String>,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct IndexingProgress {
     /// 总文件数
@@ -206,7 +204,7 @@ pub struct IndexingProgress {
 )]
 pub async fn create_index(Json(request): Json<CreateIndexRequest>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let (tx, rx) = mpsc::channel(100);
-    
+
     tokio::spawn(async move {
         let mut progress = IndexingProgress {
             total_files: 0,
@@ -226,13 +224,13 @@ pub async fn create_index(Json(request): Json<CreateIndexRequest>) -> Sse<impl S
 
             let response = reqwest::get(&request.source).await.unwrap();
             let bytes = response.bytes().await.unwrap();
-            
+
             progress.status = "解压文件...".to_string();
             let _ = tx.send(progress.clone()).await;
 
             let cursor = Cursor::new(bytes);
             let mut archive = ZipArchive::new(cursor).unwrap();
-            
+
             let temp_dir = tempfile::tempdir().unwrap();
             archive.extract(&temp_dir).unwrap();
 
@@ -252,20 +250,11 @@ pub async fn create_index(Json(request): Json<CreateIndexRequest>) -> Sse<impl S
         let embedding = embedding::create(&config).await;
         let mut indexer = tabby_index::public::CodeIndexer::default();
 
-        // 设置进度回调
-        let progress_tx = tx.clone();
-        indexer.set_progress_callback(Box::new(move |total, processed, chunks| {
-            let mut progress = IndexingProgress {
-                total_files: total,
-                processed_files: processed,
-                updated_chunks: chunks,
-                progress_percentage: (processed as f32 / total as f32) * 100.0,
-                status: "索引中...".to_string(),
-            };
-            let _ = progress_tx.blocking_send(progress);
-        }));
-
         // 开始索引
+        progress.status = "正在索引...".to_string();
+        progress.progress_percentage = 50.0;
+        let _ = tx.send(progress.clone()).await;
+
         match indexer.refresh(embedding, &repository).await {
             Ok(_) => {
                 progress.status = "索引完成".to_string();
@@ -305,4 +294,4 @@ fn to_json_value(doc: TantivyDocument, schema: &tantivy::schema::Schema) -> serd
     }
 
     doc
-} 
+}
