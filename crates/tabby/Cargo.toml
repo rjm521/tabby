@@ -65,6 +65,7 @@ regex.workspace = true
 tabby-index = { path = "../tabby-index" }
 tempfile = "3.8"
 zip = "0.6"
+tokio-stream = "0.1"
 
 [dependencies.openssl]
 optional = true

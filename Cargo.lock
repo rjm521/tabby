@@ -5660,6 +5660,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.61",
  "tokio",
+ "tokio-stream",
  "tower-http 0.5.2",
  "tracing",
  "tracing-opentelemetry 0.28.0",

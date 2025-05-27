@@ -1,5 +1,9 @@
 # Tabby 项目开发环境
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Rust](https://github.com/TabbyML/tabby/actions/workflows/rust.yml/badge.svg)](https://github.com/TabbyML/tabby/actions/workflows/rust.yml)
+
 这是一个 Tabby AI 代码补全工具的开发项目。
 
 ## 项目简介
@@ -194,15 +198,18 @@ cargo build --bin tabby
 - **创建索引**: `POST /v1/index/create` (SSE 流式响应)
   - 支持Git仓库和远程ZIP文件作为源
   - 实时进度推送，包含详细的状态信息：
-    - `total_files`: 总文件数量
-    - `processed_files`: 已处理文件数量
-    - `updated_chunks`: 已更新的代码块数量
+    - `status`: 处理状态 (initializing, downloading, extracting, cloning, indexing, completed, failed)
+    - `status_msg`: 具体的状态消息，描述当前正在进行的操作
     - `progress_percentage`: 进度百分比 (0-100)
-    - `status`: 当前状态描述（中文）
-    - `current_file`: 当前正在处理的文件路径
-    - `start_time`: 索引开始时间 (ISO 8601格式)
+    - `current_phase`: 当前阶段 (initializing, downloading, extracting, cloning, indexing)
+    - `index_stats`: 索引统计信息 (目录数量、跳过文件数、代码行数、代码块数等)
+    - `processing_rate`: 处理速度 (文件/秒)
     - `estimated_completion`: 预估完成时间
-    - `processing_rate`: 处理速度（文件/秒）
+  - 立即响应机制：接收请求后立即发送初始状态，避免用户等待
+  - 详细进度分阶段：
+    - 初始化阶段 (0-5%)
+    - 下载/克隆阶段 (5-30%)
+    - 索引处理阶段 (30-100%)
 
 #### 创建索引请求参数：
 ```json
@@ -405,3 +412,270 @@ RUST_LOG=debug ./target/debug/tabby serve --model StarCoder-1B --chat-model Qwen
 4. **重启服务**: `./stop_chat_service.sh && ./start_chat_service.sh`
 
 ## 核心功能
+
+## Code Indexing API 优化
+
+### 概述
+本项目已完成对 Tabby 的 code indexing 能力的全面优化，新增了多个 API 模块，提供了完整的代码索引管理功能。
+
+### 新增功能模块
+
+#### 1. 搜索模块 (Search Module)
+- **代码内容搜索** (`POST /v1/index/search`)
+  - 支持全文搜索代码内容
+  - 支持编程语言过滤
+  - 支持文件路径过滤
+  - 返回匹配分数和详细信息
+
+- **文件路径搜索** (`GET /v1/index/search/files`)
+  - 基于文件名的模糊搜索
+  - 支持限制返回结果数量
+
+- **语义搜索** (`POST /v1/index/search/semantic`)
+  - 基于语义的代码搜索（预留接口）
+  - 支持自然语言查询
+
+#### 2. 索引管理模块 (Index Management)
+- **索引状态查询** (`GET /v1/index/{indexId}/status`)
+  - 获取索引的详细状态信息
+  - 包括文档数量、索引大小、最后更新时间等
+
+- **索引删除** (`DELETE /v1/index/{indexId}`)
+  - 安全删除指定索引
+
+- **索引重建** (`POST /v1/index/{indexId}/rebuild`)
+  - 支持索引的增量重建
+  - 实时进度反馈
+
+#### 3. 配置管理模块 (Configuration Management)
+- **获取索引配置** (`GET /v1/index/config`)
+  - 返回当前索引配置信息
+  - 包括文件大小限制、包含/排除模式等
+
+- **配置验证** (`POST /v1/index/config/validate`)
+  - 验证索引配置的有效性
+  - 提供错误和警告信息
+
+#### 4. 智能分析模块 (Code Analysis)
+- **代码分析** (`POST /v1/index/analyze`)
+  - 分析代码复杂度
+  - 统计函数和类的数量
+  - 计算代码质量评分
+  - 生成建议的索引标签
+
+- **索引建议** (`GET /v1/index/suggestions`)
+  - 提供索引优化建议
+  - 包括性能优化和维护建议
+
+#### 5. 批量操作模块 (Batch Operations)
+- **批量创建索引** (`POST /v1/index/batch/create`)
+  - 支持批量创建多个索引
+  - 可配置并发数量
+
+- **批量操作状态** (`GET /v1/index/batch/{batch_id}/status`)
+  - 查询批量操作的进度
+  - 包括完成数量、失败数量等统计信息
+
+### 技术特性
+
+#### 实时进度反馈
+- 使用 Server-Sent Events (SSE) 提供实时进度更新
+- 包括处理速度、预估完成时间等详细信息
+- 支持错误处理和状态监控
+
+#### 高级搜索功能
+- 基于 Tantivy 全文搜索引擎
+- 支持模糊查询和精确匹配
+- 可配置的搜索结果排序和过滤
+
+#### 智能代码分析
+- 多语言代码复杂度分析
+- 自动生成索引标签
+- 代码质量评分算法
+
+#### 灵活的配置管理
+- 支持多种文件类型和编程语言
+- 可配置的包含/排除模式
+- 动态配置验证
+
+### API 使用示例
+
+#### 搜索代码
+```bash
+curl -X POST "http://localhost:8080/v1/index/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "function main",
+    "language": "rust",
+    "limit": 10
+  }'
+```
+
+#### 创建索引（实时进度）
+```bash
+curl -X POST "http://localhost:8080/v1/index/create" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{
+    "source": "https://github.com/TabbyML/tabby.git",
+    "name": "tabby-index"
+  }'
+```
+
+#### 分析代码
+```bash
+curl -X POST "http://localhost:8080/v1/index/analyze" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "fn main() { println!(\"Hello, world!\"); }",
+    "filepath": "src/main.rs",
+    "language": "rust"
+  }'
+```
+
+### 数据结构
+
+#### SearchResult
+```json
+{
+  "file_path": "src/main.rs",
+  "content": "fn main() { println!(\"Hello, world!\"); }",
+  "start_line": 1,
+  "end_line": 3,
+  "score": 0.95,
+  "language": "rust",
+  "git_url": "https://github.com/user/repo.git"
+}
+```
+
+#### IndexStatus
+```json
+{
+  "index_id": "idx_abc123def456",
+  "status": "ready",
+  "document_count": 1500,
+  "size_bytes": 1048576,
+  "last_updated": "2024-03-21T10:30:00Z",
+  "version": "1.0"
+}
+```
+
+#### AnalyzeResponse
+```json
+{
+  "complexity": 2,
+  "function_count": 1,
+  "class_count": 0,
+  "lines_of_code": 3,
+  "suggested_tags": ["main", "function", "rust"],
+  "quality_score": 85
+}
+```
+
+### 性能优化
+
+#### 索引优化
+- 使用 Tantivy 高性能搜索引擎
+- 支持增量索引更新
+- 内存和磁盘使用优化
+
+#### 并发处理
+- 支持批量操作的并发处理
+- 异步任务处理
+- 资源使用监控
+
+#### 缓存机制
+- 搜索结果缓存
+- 配置信息缓存
+- 智能缓存失效策略
+
+### 错误处理
+
+#### 统一错误格式
+所有 API 都使用统一的错误响应格式：
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "error_code": "INDEX_NOT_FOUND"
+}
+```
+
+#### 错误类型
+- `INDEX_NOT_FOUND`: 索引不存在
+- `INVALID_CONFIG`: 配置无效
+- `SEARCH_FAILED`: 搜索失败
+- `ANALYSIS_FAILED`: 代码分析失败
+
+### 监控和日志
+
+#### 性能监控
+- API 响应时间监控
+- 索引操作性能统计
+- 资源使用情况监控
+
+#### 详细日志
+- 操作审计日志
+- 错误详细日志
+- 性能分析日志
+
+### 扩展性
+
+#### 插件架构
+- 支持自定义代码分析器
+- 可扩展的搜索算法
+- 灵活的索引策略
+
+#### 多语言支持
+- 支持主流编程语言
+- 可配置的语言特定处理
+- 语言检测和分类
+
+### 安全性
+
+#### 访问控制
+- API 令牌认证
+- 权限级别控制
+- 操作审计
+
+#### 数据保护
+- 敏感信息过滤
+- 安全的文件访问
+- 输入验证和清理
+
+### 部署和维护
+
+#### 配置文件
+索引配置示例：
+```json
+{
+  "max_file_size": 1024,
+  "include_patterns": ["**/*.rs", "**/*.py", "**/*.js"],
+  "exclude_patterns": ["target/**", "node_modules/**"],
+  "languages": ["rust", "python", "javascript"],
+  "enable_semantic_search": true,
+  "update_interval_seconds": 3600
+}
+```
+
+#### 维护建议
+- 定期重建索引以优化性能
+- 监控索引大小和文档数量
+- 根据使用情况调整配置参数
+- 定期清理过期索引
+
+### 未来规划
+
+#### 计划功能
+- 增强的语义搜索功能
+- 机器学习驱动的代码建议
+- 更多编程语言支持
+- 分布式索引架构
+
+#### 性能改进
+- 更快的索引构建速度
+- 更精确的搜索算法
+- 更好的内存管理
+- 实时索引更新
+
+这个全面的 code indexing API 优化为 Tabby 项目提供了强大的代码搜索和分析能力，支持开发者更高效地管理和搜索代码库。
