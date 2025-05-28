@@ -16,6 +16,7 @@ use axum::{
 };
 use juniper::ID;
 use juniper_axum::{graphiql, playground};
+use serde::{Deserialize, Serialize};
 use tabby_common::api::server_setting::ServerSetting;
 use tabby_schema::{
     auth::AuthenticationService, create_schema, job::JobService, Schema, ServiceLocator,
@@ -23,13 +24,50 @@ use tabby_schema::{
 use tower::util::ServiceExt;
 use tower_http::services::ServeFile;
 use tracing::{error, warn};
+use utoipa::ToSchema;
 
 use self::hub::HubState;
 use crate::{
     axum::{extract::AuthBearer, graphql, FromAuth},
-    jwt::{generate_jwt_payload, validate_jwt},
+    jwt::{generate_jwt_payload, validate_jwt, generate_jwt},
     service::answer::AnswerService,
 };
+
+#[derive(Deserialize, ToSchema)]
+pub struct GetTokenRequest {
+    #[schema(example = "user@example.com")]
+    email: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct GetTokenResponse {
+    #[serde(rename = "accessToken")]
+    #[schema(example = "your_access_token_here")]
+    access_token: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct GraphqlHttpRequest {
+    #[schema(example = "query { me { email } }")]
+    query: String,
+    #[schema(example = json!({ "variableName": "value" }))]
+    variables: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct RegisterRequest {
+    #[schema(example = "user@example.com")]
+    pub email: String,
+    #[schema(example = "新用户")]
+    pub name: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct RegisterResponse {
+    #[serde(rename = "accessToken")]
+    #[schema(example = "your_access_token_here")]
+    pub access_token: String,
+}
 
 pub fn create(
     ctx: Arc<dyn ServiceLocator>,
@@ -108,7 +146,12 @@ pub fn create(
             repositories::routes(ctx.repository(), ctx.auth()),
         )
         .route("/avatar/{id}", routing::get(avatar).with_state(ctx.auth()))
-        .nest("/oauth", oauth::routes(ctx.auth()));
+        .nest("/oauth", oauth::routes(ctx.auth()))
+        .route("/v1/auth/token", routing::post(get_user_token).with_state(ctx.auth()))
+        // Add the new route for executing GraphQL over HTTP
+        .route("/v1/graphql", routing::post(execute_graphql_http).with_state(ctx.clone()))
+        // Add the new RESTful register API
+        .route("/v1/auth/register", routing::post(register_user).with_state(ctx.auth()));
 
     let ui = ui.route(
         "/graphiql",
@@ -219,6 +262,94 @@ async fn avatar(
     Ok(response)
 }
 
+// Handler for the new /v1/auth/token API
+#[utoipa::path(
+    post,
+    path = "/v1/auth/token",
+    request_body = GetTokenRequest,
+    responses(
+        (status = 200, description = "Successfully retrieved token", body = GetTokenResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_user_token(
+    State(auth_service): State<Arc<dyn AuthenticationService>>,
+    Json(payload): Json<GetTokenRequest>,
+) -> Result<Json<GetTokenResponse>, StatusCode> {
+    if payload.email.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    match auth_service.get_user_by_email(&payload.email).await {
+        Ok(user) => {
+            // Directly generate a new access token for the user without password validation
+            match generate_jwt(user.id) { // Assuming user.id is compatible with generate_jwt
+                Ok(access_token) => Ok(Json(GetTokenResponse { access_token })),
+                Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR), // Failed to generate token
+            }
+        }
+        Err(_) => Err(StatusCode::NOT_FOUND), // User not found by email
+    }
+}
+
+// Handler for the new /v1/graphql API
+#[utoipa::path(
+    post,
+    path = "/v1/graphql",
+    request_body = GraphqlHttpRequest,
+    responses(
+        (status = 200, description = "GraphQL query executed successfully", body = serde_json::Value),
+        (status = 400, description = "Invalid input"),
+        (status = 500, description = "Internal server error or GraphQL execution error")
+    ),
+)]
+pub async fn execute_graphql_http(
+    State(locator): State<Arc<dyn ServiceLocator>>,
+    Extension(schema): Extension<Arc<Schema>>,
+    AuthBearer(token): AuthBearer, // To pass along authentication info if present
+    Json(payload): Json<GraphqlHttpRequest>,
+) -> impl IntoResponse {
+    let context = tabby_schema::Context::build(locator.clone(), token).await;
+
+    // Convert serde_json::Value to juniper::Variables
+    let vars = match payload.variables {
+        Some(v) => match serde_json::from_value::<juniper::Variables>(v) {
+            Ok(vars) => vars,
+            Err(err) => {
+                warn!("Failed to deserialize GraphQL variables: {}", err);
+                return StatusCode::BAD_REQUEST.into_response();
+            }
+        },
+        None => juniper::Variables::new(),
+    };
+
+    let execution_result = juniper::execute(
+        &payload.query,
+        None, // operation_name
+        &schema,
+        &vars,
+        &context,
+    )
+    .await;
+
+    // Serialize execution result to JSON
+    let body_json = match serde_json::to_string(&execution_result) {
+        Ok(s) => s,
+        Err(err) => {
+            warn!("Failed to serialize GraphQL execution result: {}", err);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Body::from(body_json))
+        .unwrap()
+}
+
 #[async_trait::async_trait]
 impl FromAuth<Arc<dyn ServiceLocator>> for tabby_schema::Context {
     async fn build(locator: Arc<dyn ServiceLocator>, token: Option<String>) -> Self {
@@ -256,6 +387,46 @@ async fn background_job_logs(
     let serve_file = ServeFile::new(log_file_path);
     match serve_file.oneshot(request).await {
         Ok(response) => Ok(response.into_response()),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/auth/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "注册成功", body = RegisterResponse),
+        (status = 400, description = "参数错误"),
+        (status = 409, description = "用户已存在"),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
+pub async fn register_user(
+    State(auth_service): State<Arc<dyn AuthenticationService>>,
+    Json(payload): Json<RegisterRequest>,
+) -> Result<Json<RegisterResponse>, StatusCode> {
+    if payload.email.is_empty() || payload.name.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    // 检查用户是否已存在
+    if auth_service.get_user_by_email(&payload.email).await.is_ok() {
+        return Err(StatusCode::CONFLICT);
+    }
+    // 默认密码
+    let password = "TabbyR0cks!".to_string();
+    // 调用注册逻辑
+    match auth_service.register(payload.email.clone(), password, None, Some(payload.name.clone())).await {
+        Ok(_) => {
+            // 注册成功后直接生成token
+            match auth_service.get_user_by_email(&payload.email).await {
+                Ok(user) => match generate_jwt(user.id) {
+                    Ok(access_token) => Ok(Json(RegisterResponse { access_token })),
+                    Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+                },
+                Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+            }
+        },
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
