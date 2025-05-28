@@ -19,6 +19,7 @@ Tabby是一个自托管的AI代码助手，为你的团队提供智能代码补�
 - **📧 邮件通知**: 完整的邮件服务集成
 - **🎛️ 管理界面**: 现代化的Web管理控制台
 - **🔑 HTTP API**: 新增通过HTTP接口获取用户Token和执行GraphQL查询的功能
+- **🤖 用户模型配置**: 允许用户个性化设置代码补全和聊天功能的AI模型选择 (开发中)
 
 ## 🛠️ 安装和部署
 
@@ -1156,3 +1157,230 @@ curl -X POST "http://localhost:8080/v1/index/analyze" \
 用户可以直接使用现有的GraphQL API（`http://localhost:8080/graphql`）进行所有用户管理操作，或使用Web界面（`http://localhost:8080`）进行可视化管理。
 
 该系统比最初请求的简单HTTP API更加强大和安全，完全满足并超越了用户的需求。
+
+---
+
+## 🚀 新功能开发：用户模型配置系统
+
+### 功能概述
+
+**目标**：为用户提供个性化的AI模型选择能力，允许每个用户根据自己的需求和偏好设置不同的代码补全模型和聊天模型。
+
+### 核心功能特性
+
+#### 1. **个性化模型选择**
+- 用户可以独立配置代码补全使用的模型
+- 用户可以独立配置聊天功能使用的模型
+- 支持从系统可用模型列表中选择
+- 提供模型性能和特性说明帮助用户选择
+
+#### 2. **模型管理界面**
+- 在Web管理界面中新增"模型配置"页面
+- 显示当前可用的所有模型
+- 提供模型性能指标和使用建议
+- 支持模型配置的实时预览和测试
+
+#### 3. **API接口扩展**
+- 扩展GraphQL API支持用户模型配置
+- 新增用户模型偏好的增删改查操作
+- 支持批量模型配置更新
+- 提供模型配置历史记录
+
+#### 4. **兼容性保证**
+- 保持现有API的完全兼容性
+- 新用户使用系统默认模型配置
+- 支持管理员设置组织级别的默认模型
+
+### 技术实现架构
+
+#### 1. **数据库设计**
+```sql
+-- 用户模型配置表
+CREATE TABLE user_model_preferences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    completion_model TEXT,    -- 代码补全模型
+    chat_model TEXT,         -- 聊天模型
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- 可用模型配置表
+CREATE TABLE available_models (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_name TEXT UNIQUE NOT NULL,
+    model_type TEXT NOT NULL,  -- 'completion' 或 'chat'
+    description TEXT,
+    performance_tier TEXT,    -- 'high', 'medium', 'low'
+    resource_requirements TEXT,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### 2. **GraphQL API扩展**
+```graphql
+# 查询用户模型配置
+type Query {
+  userModelPreferences: UserModelPreferences
+  availableModels(type: ModelType): [AvailableModel!]!
+}
+
+# 更新用户模型配置
+type Mutation {
+  updateUserModelPreferences(
+    completionModel: String
+    chatModel: String
+  ): UserModelPreferences!
+
+  resetUserModelPreferences: UserModelPreferences!
+}
+
+# 数据类型定义
+type UserModelPreferences {
+  userId: String!
+  completionModel: String
+  chatModel: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AvailableModel {
+  name: String!
+  type: ModelType!
+  description: String
+  performanceTier: PerformanceTier!
+  resourceRequirements: String
+  isEnabled: Boolean!
+}
+
+enum ModelType {
+  COMPLETION
+  CHAT
+}
+
+enum PerformanceTier {
+  HIGH
+  MEDIUM
+  LOW
+}
+```
+
+#### 3. **服务层架构**
+```rust
+// 新增模型配置服务
+pub struct ModelConfigurationService {
+    db: Arc<DbConn>,
+}
+
+impl ModelConfigurationService {
+    // 获取用户模型配置
+    pub async fn get_user_preferences(&self, user_id: &str) -> Result<UserModelPreferences>;
+
+    // 更新用户模型配置
+    pub async fn update_user_preferences(&self, user_id: &str, config: UpdateModelConfig) -> Result<UserModelPreferences>;
+
+    // 获取可用模型列表
+    pub async fn get_available_models(&self, model_type: Option<ModelType>) -> Result<Vec<AvailableModel>>;
+
+    // 验证模型配置有效性
+    pub async fn validate_model_config(&self, config: &ModelConfig) -> Result<bool>;
+}
+```
+
+#### 4. **前端界面设计**
+- **模型配置页面**：位于用户设置菜单
+- **模型选择器**：下拉列表展示可用模型
+- **性能说明**：每个模型的详细信息和建议
+- **测试功能**：配置后可进行即时测试
+- **历史记录**：显示配置变更历史
+
+### 开发路线图
+
+#### 阶段1：基础架构（1-2周）
+- [ ] 设计和创建数据库表结构
+- [ ] 实现基础的模型配置服务层
+- [ ] 扩展GraphQL API支持模型配置
+- [ ] 编写基础单元测试
+
+#### 阶段2：核心功能（2-3周）
+- [ ] 实现用户模型偏好的CRUD操作
+- [ ] 集成模型配置到代码补全流程
+- [ ] 集成模型配置到聊天功能流程
+- [ ] 实现配置验证和错误处理
+
+#### 阶段3：用户界面（2周）
+- [ ] 设计和实现Web端模型配置页面
+- [ ] 实现模型选择和配置功能
+- [ ] 添加配置测试和预览功能
+- [ ] 优化用户体验和界面设计
+
+#### 阶段4：高级功能（1-2周）
+- [ ] 实现配置历史记录功能
+- [ ] 添加管理员模型管理功能
+- [ ] 实现批量配置和导入导出
+- [ ] 性能优化和缓存机制
+
+#### 阶段5：测试和发布（1周）
+- [ ] 完整功能测试和回归测试
+- [ ] 性能测试和优化
+- [ ] 文档更新和用户指南
+- [ ] 发布准备和部署
+
+### 使用示例
+
+#### 通过GraphQL配置模型
+```graphql
+# 查询可用模型
+query {
+  availableModels {
+    name
+    type
+    description
+    performanceTier
+  }
+}
+
+# 更新用户模型配置
+mutation {
+  updateUserModelPreferences(
+    completionModel: "StarCoder-7B"
+    chatModel: "Qwen2-7B-Instruct"
+  ) {
+    userId
+    completionModel
+    chatModel
+    updatedAt
+  }
+}
+```
+
+#### 通过Web界面配置
+1. 登录Tabby Web界面
+2. 进入"用户设置" → "模型配置"
+3. 选择代码补全模型和聊天模型
+4. 保存配置并可选择测试功能
+
+### 兼容性说明
+
+- **向后兼容**：现有用户和API完全不受影响
+- **渐进增强**：新功能作为可选功能逐步推出
+- **默认行为**：未配置用户继续使用系统默认模型
+- **管理员控制**：管理员可以设置组织级别的模型策略
+
+### 预期收益
+
+1. **个性化体验**：用户可根据需求选择最适合的模型
+2. **性能优化**：用户可以平衡性能和资源消耗
+3. **灵活性增强**：支持不同场景下的不同模型策略
+4. **用户满意度**：提供更加定制化的AI助手体验
+
+### 风险和缓解措施
+
+1. **性能影响**：通过缓存和优化减少配置查询开销
+2. **复杂性增加**：提供清晰的用户指南和默认推荐
+3. **模型兼容性**：建立模型验证机制确保配置有效性
+4. **资源管理**：实现智能的资源分配和负载均衡
+
+这个功能将使Tabby成为更加灵活和个性化的AI代码助手平台，满足不同用户的特定需求和使用场景。
