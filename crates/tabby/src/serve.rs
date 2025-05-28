@@ -37,6 +37,8 @@ use crate::{
     to_local_config, Device,
 };
 
+use tabby_server::api::user::{RegisterRequest, RegisterResponse, QueryTokenRequest, QueryTokenResponse};
+
 #[derive(OpenApi)]
 #[openapi(
     info(title="Tabby Server",
@@ -75,6 +77,8 @@ Install following IDE / Editor extensions to get started with [Tabby](https://gi
         routes::index::get_suggestions,
         routes::index::batch_create_index,
         routes::index::get_batch_status,
+        tabby_server::api::user::register_user,
+        tabby_server::api::user::query_user_token,
     ),
     components(schemas(
         api::event::LogEventRequest,
@@ -107,6 +111,10 @@ Install following IDE / Editor extensions to get started with [Tabby](https://gi
         routes::index::BatchCreateRequest,
         routes::index::BatchStatus,
         routes::index::CreateIndexResponse,
+        RegisterRequest,
+        RegisterResponse,
+        QueryTokenRequest,
+        QueryTokenResponse,
     )),
     modifiers(&SecurityAddon),
 )]

@@ -17,4 +17,9 @@ tempfile = "3.8"
 walkdir = "2.4"
 glob = "0.3"
 tantivy = "0.22"
-tower-http = { version = "0.5", features = ["cors"] } 
+tower-http = { version = "0.5", features = ["cors"] }
+utoipa = { version = "4.0", features = ["axum_extras"] }
+argon2 = "0.5"
+
+# 引用企业版数据库模块
+tabby-db = { path = "../../ee/tabby-db" }

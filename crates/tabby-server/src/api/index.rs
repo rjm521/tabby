@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 use axum::{
     extract::Json,
     http::StatusCode,
     response::IntoResponse,
-    routing::post,
+    routing::{post, get},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -14,9 +14,10 @@ use walkdir::WalkDir;
 use glob::Pattern;
 use tantivy::{
     schema::{Schema, SchemaBuilder, TEXT, STORED},
-    Index, IndexWriter,
+    Index,
     doc,
 };
+use tabby_db::DbConn;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateIndexRequest {
@@ -34,8 +35,11 @@ pub struct CreateIndexResponse {
     pub message: String,
 }
 
-pub fn router() -> Router {
-    Router::new().route("/create", post(create_index))
+pub fn router() -> Router<Arc<DbConn>> {
+    Router::new()
+        .route("/create", post(create_index))
+        .route("/user/register", post(super::user::register_user))
+        .route("/user/token", get(super::user::query_user_token))
 }
 
 fn create_schema() -> Schema {
@@ -61,7 +65,7 @@ async fn create_index(
     })?;
 
     // Clone the repository
-    let repo = match Repository::clone(&payload.source, temp_dir.path()) {
+    let _repo = match Repository::clone(&payload.source, temp_dir.path()) {
         Ok(repo) => repo,
         Err(e) => {
             return Err((
@@ -186,4 +190,4 @@ async fn create_index(
             message: format!("Successfully created index for {}", payload.name),
         }),
     ))
-} 
+}
