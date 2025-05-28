@@ -67,26 +67,34 @@ struct FIMResponseDelta {
 
 #[async_trait]
 impl CompletionStream for MistralFIMEngine {
-    async fn generate(&self, prompt: &str, options: CompletionOptions) -> BoxStream<String> {
+    async fn generate(
+        &self,
+        prompt: &str,
+        options: CompletionOptions,
+        model_name_override: Option<&str>,
+    ) -> BoxStream<String> {
         let (prompt, suffix) = split_fim_prompt(prompt);
-        let request = FIMRequest {
+
+        let effective_model_name = model_name_override.unwrap_or(&self.model_name).to_string();
+
+        let request_body = FIMRequest {
             prompt: prompt.to_owned(),
             suffix: suffix.map(|x| x.to_owned()),
-            model: self.model_name.clone(),
+            model: effective_model_name,
             max_tokens: options.max_decoding_tokens,
             temperature: options.sampling_temperature,
             stream: true,
             random_seed: options.seed,
         };
 
-        let request = self
+        let request_builder = self
             .client
             .post(&self.api_endpoint)
             .bearer_auth(&self.api_key)
-            .json(&request);
+            .json(&request_body);
 
         let s = stream! {
-            let mut es = EventSource::new(request).expect("Failed to create event source");
+            let mut es = EventSource::new(request_builder).expect("Failed to create event source");
             while let Some(event) = es.next().await {
                 match event {
                     Ok(Event::Open) => {}

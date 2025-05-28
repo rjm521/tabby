@@ -19,7 +19,8 @@ use crate::{
     routes,
     service::{
         create_service_locator, embedding, event_logger::create_event_logger, ingestion,
-        integration, job, new_auth_service, new_email_service, new_license_service,
+        integration, job, model_configuration,
+        new_auth_service, new_email_service, new_license_service,
         new_setting_service, repository, web_documents,
     },
 };
@@ -61,9 +62,9 @@ impl Webserver {
         config: &Config,
         api: Router,
         ui: Router,
-        code: Arc<dyn CodeSearch>,
-        chat: Option<Arc<dyn ChatCompletionStream>>,
-        completion: Option<Arc<dyn CompletionStream>>,
+        code_search_service: Arc<dyn CodeSearch>,
+        chat_stream_from_args: Option<Arc<dyn ChatCompletionStream>>,
+        completion_stream_from_args: Option<Arc<dyn CompletionStream>>,
         docsearch: Arc<dyn DocSearch>,
         serper_factory_fn: impl Fn(&str) -> Box<dyn DocSearch>,
     ) -> (Router, Router) {
@@ -76,82 +77,84 @@ impl Webserver {
             };
 
         let db = self.db.clone();
-        let job: Arc<dyn JobService> = Arc::new(job::create(db.clone()).await);
+        let logger = self.logger();
+        let job_service: Arc<dyn JobService> = Arc::new(job::create(db.clone()).await);
 
-        let integration = Arc::new(integration::create(db.clone(), job.clone()));
-        let repository = repository::create(db.clone(), integration.clone(), job.clone());
+        let integration_service = Arc::new(integration::create(db.clone(), job_service.clone()));
+        let repository_service = repository::create(db.clone(), integration_service.clone(), job_service.clone());
 
-        let web_documents = Arc::new(web_documents::create(db.clone(), job.clone()));
-        let ingestion = Arc::new(ingestion::create(db.clone()));
+        let web_documents_service = Arc::new(web_documents::create(db.clone(), job_service.clone()));
+        let ingestion_service = Arc::new(ingestion::create(db.clone()));
 
-        let context = Arc::new(crate::service::context::create(
-            repository.clone(),
-            ingestion.clone(),
-            web_documents.clone(),
+        let context_service = Arc::new(crate::service::context::create(
+            repository_service.clone(),
+            ingestion_service.clone(),
+            web_documents_service.clone(),
             serper.is_some(),
         ));
 
-        let mail = Arc::new(
+        let mail_service = Arc::new(
             new_email_service(db.clone())
                 .await
                 .expect("failed to initialize mail service"),
         );
-        let license = Arc::new(
+        let license_service = Arc::new(
             new_license_service(db.clone())
                 .await
                 .expect("failed to initialize license service"),
         );
-        let setting = Arc::new(new_setting_service(db.clone()));
-        let auth = Arc::new(new_auth_service(
+        let setting_service = Arc::new(new_setting_service(db.clone()));
+        let auth_service = Arc::new(new_auth_service(
             db.clone(),
-            mail.clone(),
-            license.clone(),
-            setting.clone(),
+            mail_service.clone(),
+            license_service.clone(),
+            setting_service.clone(),
         ));
 
-        let retrieval = Arc::new(crate::service::retrieval::create(
-            code.clone(),
+        let retrieval_service = Arc::new(crate::service::retrieval::create(
+            code_search_service.clone(),
             docsearch.clone(),
             serper,
-            repository.clone(),
-            setting.clone(),
+            repository_service.clone(),
+            setting_service.clone(),
         ));
 
-        let answer = chat.as_ref().map(|chat| {
+        let answer_service = chat_stream_from_args.as_ref().map(|chat_s| {
             Arc::new(crate::service::answer::create(
-                self.logger(),
+                logger.clone(),
                 &config.answer,
-                auth.clone(),
-                chat.clone(),
-                retrieval.clone(),
-                context.clone(),
+                auth_service.clone(),
+                chat_s.clone(),
+                retrieval_service.clone(),
+                context_service.clone(),
             ))
         });
 
-        let embedding = embedding::create(&config.embedding, self.embedding.clone());
+        let embedding_service = embedding::create(&config.embedding, self.embedding.clone());
 
-        let ctx = create_service_locator(
-            self.logger(),
-            auth,
-            chat.clone(),
-            completion.clone(),
-            code.clone(),
-            repository.clone(),
-            integration.clone(),
-            ingestion,
-            job.clone(),
-            answer.clone(),
-            retrieval,
-            context.clone(),
-            web_documents.clone(),
-            mail,
-            license,
-            setting,
-            self.db.clone(),
-            embedding,
+        let service_locator = create_service_locator(
+            logger.clone(),
+            auth_service,
+            chat_stream_from_args,
+            completion_stream_from_args,
+            code_search_service.clone(),
+            repository_service.clone(),
+            integration_service.clone(),
+            ingestion_service,
+            job_service.clone(),
+            answer_service.clone(),
+            retrieval_service,
+            context_service.clone(),
+            web_documents_service.clone(),
+            mail_service,
+            license_service,
+            setting_service,
+            model_configuration::create(Arc::new(db.clone())),
+            db.clone(),
+            embedding_service,
         )
         .await;
 
-        routes::create(ctx, api, ui, answer)
+        routes::create(service_locator, api, ui, answer_service)
     }
 }

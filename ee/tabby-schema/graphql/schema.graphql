@@ -122,6 +122,17 @@ enum Role {
   ASSISTANT
 }
 
+enum ModelTypeEnum {
+  COMPLETION
+  CHAT
+}
+
+enum PerformanceTierEnum {
+  HIGH
+  MEDIUM
+  LOW
+}
+
 input CodeQueryInput {
   filepath: String
   language: String
@@ -339,6 +350,11 @@ input UpsertUserGroupMembershipInput {
   userGroupId: ID!
   userId: ID!
   isGroupAdmin: Boolean!
+}
+
+input UpdateUserModelPreferencesInput {
+  completionModel: String
+  chatModel: String
 }
 
 interface ContextSource implements ContextSourceId {
@@ -879,6 +895,8 @@ type Mutation {
   deleteUserGroupMembership(userGroupId: ID!, userId: ID!): Boolean!
   grantSourceIdReadAccess(sourceId: String!, userGroupId: ID!): Boolean!
   revokeSourceIdReadAccess(sourceId: String!, userGroupId: ID!): Boolean!
+  updateUserModelPreferences(input: UpdateUserModelPreferencesInput!): UserModelPreferences!
+  resetUserModelPreferences: UserModelPreferences!
 }
 
 type NetworkSetting {
@@ -1141,6 +1159,8 @@ type Query {
   sourceIdAccessPolicies(sourceId: String!): SourceIdAccessPolicy!
   testModelConnection(backend: ModelHealthBackend!): ModelBackendHealthInfo!
   readRepositoryRelatedQuestions(sourceId: String!): [String!]!
+  userModelPreferences: UserModelPreferences
+  availableModels(type: ModelTypeEnum): [AvailableModel!]!
 }
 
 type RefreshTokenResponse {
@@ -1384,3 +1404,21 @@ union SectionRunItem = PageSectionCreated | PageSectionAttachmentCodeFileList | 
   Apart from `thread_message_content_delta`, all other items will only appear once in the stream.
 """
 union ThreadRunItem = ThreadCreated | ThreadRelevantQuestions | ThreadUserMessageCreated | ThreadAssistantMessageCreated | ThreadAssistantMessageReadingCode | ThreadAssistantMessageAttachmentsCodeFileList | ThreadAssistantMessageAttachmentsCode | ThreadAssistantMessageReadingDoc | ThreadAssistantMessageAttachmentsDoc | ThreadAssistantMessageContentDelta | ThreadAssistantMessageCompleted
+
+type AvailableModel {
+  id: ID!
+  modelName: String!
+  modelType: ModelTypeEnum!
+  description: String
+  performanceTier: PerformanceTierEnum
+  resourceRequirements: String
+  isEnabled: Boolean!
+  createdAt: DateTime!
+}
+
+type UserModelPreferences {
+  completionModel: String
+  chatModel: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}

@@ -30,14 +30,17 @@ pub async fn completions(
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     Json(mut request): Json<CompletionRequest>,
 ) -> Result<Json<CompletionResponse>, StatusCode> {
-    if let Some(user) = user {
-        request.user.replace(user);
+    if let Some(user_id_str) = user {
+        request.user.replace(user_id_str);
     }
 
-    let user_agent = user_agent.map(|x| x.0.to_string());
+    let user_agent_str = user_agent.map(|x| x.0.to_string());
+
+    // Standard version calls with no model override
+    let model_name_override: Option<&str> = None;
 
     match state
-        .generate(&request, &allowed_code_repository, user_agent.as_deref())
+        .generate(&request, &allowed_code_repository, user_agent_str.as_deref(), model_name_override)
         .await
     {
         Ok(resp) => Ok(Json(resp)),

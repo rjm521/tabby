@@ -4,6 +4,7 @@ use futures::{stream::BoxStream, StreamExt};
 use reqwest_eventsource::{Event, EventSource};
 use serde::{Deserialize, Serialize};
 use tabby_inference::{CompletionOptions, CompletionStream};
+use tracing::warn;
 
 use crate::create_reqwest_client;
 
@@ -44,7 +45,19 @@ struct CompletionResponseChunk {
 
 #[async_trait]
 impl CompletionStream for LlamaCppEngine {
-    async fn generate(&self, prompt: &str, options: CompletionOptions) -> BoxStream<String> {
+    async fn generate(
+        &self,
+        prompt: &str,
+        options: CompletionOptions,
+        model_name_override: Option<&str>,
+    ) -> BoxStream<String> {
+        if let Some(overridden_model) = model_name_override {
+            warn!(
+                "LlamaCppEngine received model_name_override: '{}'. This engine is configured for a specific model at its endpoint and may not use the overridden model.",
+                overridden_model
+            );
+        }
+
         // Always use streaming mode in generate method
         let request_body = CompletionRequest {
             seed: options.seed,
@@ -56,13 +69,13 @@ impl CompletionStream for LlamaCppEngine {
             presence_penalty: options.presence_penalty,
         };
 
-        let mut request = self.client.post(&self.api_endpoint).json(&request_body);
+        let mut request_builder = self.client.post(&self.api_endpoint).json(&request_body);
         if let Some(api_key) = &self.api_key {
-            request = request.bearer_auth(api_key);
+            request_builder = request_builder.bearer_auth(api_key);
         }
 
         let s = stream! {
-            let mut es = EventSource::new(request).expect("Failed to create event source");
+            let mut es = EventSource::new(request_builder).expect("Failed to create event source");
             while let Some(event) = es.next().await {
                 match event {
                     Ok(Event::Open) => {}

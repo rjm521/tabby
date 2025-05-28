@@ -9,6 +9,7 @@ pub mod integration;
 pub mod interface;
 pub mod job;
 pub mod license;
+pub mod model_configuration;
 pub mod notification;
 pub mod page;
 pub mod repository;
@@ -97,6 +98,13 @@ use crate::{
     juniper::relay::{self, query_async, Connection},
     web_documents::{PresetWebDocument, SetPresetDocumentActiveInput},
 };
+use crate::schema::model_configuration::ModelConfigurationService;
+use crate::schema::model_configuration::{
+    AvailableModel,
+    UserModelPreference,
+    ModelType as ModelConfigurationModelType,
+    UpdateUserModelPreferenceInput
+};
 
 pub trait ServiceLocator: Send + Sync {
     fn auth(&self) -> Arc<dyn AuthenticationService>;
@@ -122,6 +130,7 @@ pub trait ServiceLocator: Send + Sync {
     fn user_group(&self) -> Arc<dyn UserGroupService>;
     fn access_policy(&self) -> Arc<dyn AccessPolicyService>;
     fn notification(&self) -> Arc<dyn NotificationService>;
+    fn model_configuration(&self) -> Arc<dyn ModelConfigurationService>;
 }
 
 pub struct Context {
@@ -970,7 +979,6 @@ impl Query {
     ) -> Result<ModelBackendHealthInfo, TestModelConnectionError> {
         check_admin(ctx).await?;
 
-        // count request time in milliseconds
         let start = Instant::now();
 
         match backend {
@@ -985,7 +993,7 @@ impl Query {
                         .expect("Failed to build completion options");
 
                     let (first, _) = completion
-                        .generate("def fib(n):\n", options)
+                        .generate("def fib(n):\n", options, None)
                         .await
                         .into_future()
                         .await;
@@ -1051,6 +1059,14 @@ impl Query {
                 source_id,
             )
             .await
+    }
+
+    async fn user_model_preferences(ctx: &Context) -> Result<Option<UserModelPreference>> {
+        model_configuration::user_model_preferences(ctx).await
+    }
+
+    async fn available_models(ctx: &Context, model_type: Option<ModelConfigurationModelType>) -> Result<Vec<AvailableModel>> {
+        model_configuration::available_models(ctx, model_type).await
     }
 }
 
@@ -1763,6 +1779,14 @@ impl Mutation {
             .revoke_source_id_read_access(&source_id, &user_group_id)
             .await?;
         Ok(true)
+    }
+
+    async fn update_user_model_preferences(ctx: &Context, input: UpdateUserModelPreferenceInput) -> Result<UserModelPreference> {
+        model_configuration::update_user_model_preferences(ctx, input).await
+    }
+
+    async fn reset_user_model_preferences(ctx: &Context) -> Result<UserModelPreference> {
+        model_configuration::reset_user_model_preferences(ctx).await
     }
 }
 

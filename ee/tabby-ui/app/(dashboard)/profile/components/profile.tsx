@@ -6,6 +6,7 @@ import { Avatar } from './avatar'
 import { ChangeName } from './change-name'
 import { ChangePassword } from './change-password'
 import { Email } from './email'
+import { ModelPreferences } from './model-preferences'
 import { ProfileCard } from './profile-card'
 
 export default function Profile() {
@@ -35,6 +36,7 @@ export default function Profile() {
       >
         <ChangePassword />
       </ProfileCard>
+      <ModelPreferences />
     </div>
   )
 }

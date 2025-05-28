@@ -64,15 +64,22 @@ struct CompletionResponseChoice {
 
 #[async_trait]
 impl CompletionStream for OpenAICompletionEngine {
-    async fn generate(&self, prompt: &str, options: CompletionOptions) -> BoxStream<String> {
+    async fn generate(
+        &self,
+        prompt: &str,
+        options: CompletionOptions,
+        model_name_override: Option<&str>,
+    ) -> BoxStream<String> {
         let (prompt, suffix) = if self.support_fim {
             split_fim_prompt(prompt)
         } else {
             (prompt, None)
         };
 
+        let effective_model_name = model_name_override.unwrap_or(&self.model_name).to_string();
+
         let request = CompletionRequest {
-            model: self.model_name.clone(),
+            model: effective_model_name,
             prompt: prompt.to_owned(),
             suffix: suffix.map(|x| x.to_owned()),
             max_tokens: options.max_decoding_tokens,
@@ -81,13 +88,13 @@ impl CompletionStream for OpenAICompletionEngine {
             presence_penalty: options.presence_penalty,
         };
 
-        let mut request = self.client.post(&self.api_endpoint).json(&request);
+        let mut request_builder = self.client.post(&self.api_endpoint).json(&request);
         if let Some(api_key) = &self.api_key {
-            request = request.bearer_auth(api_key);
+            request_builder = request_builder.bearer_auth(api_key);
         }
 
         let s = stream! {
-            let mut es = EventSource::new(request).expect("Failed to create event source");
+            let mut es = EventSource::new(request_builder).expect("Failed to create event source");
             while let Some(event) = es.next().await {
                 match event {
                     Ok(Event::Open) => {}

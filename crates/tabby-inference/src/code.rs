@@ -55,7 +55,12 @@ impl CodeGeneration {
 }
 
 impl CodeGeneration {
-    pub async fn generate(&self, prompt: &str, options: CodeGenerationOptions) -> String {
+    pub async fn generate(
+        &self,
+        prompt: &str,
+        options: CodeGenerationOptions,
+        model_name: Option<&str>,
+    ) -> String {
         // Clip prompt by options.max_input_length (truncate from beginning)
         let prompt = if options.max_input_length > 0 {
             clip_prompt(prompt, options.max_input_length)
@@ -72,7 +77,7 @@ impl CodeGeneration {
 
         if options.mode == "next_edit_suggestion" {
             tracing::debug!("Using generate_sync for next_edit_suggestion mode");
-            return self.imp.generate_sync(prompt, completion_options).await;
+            return self.imp.generate_sync(prompt, completion_options, model_name).await;
         }
 
         // For standard mode, use streaming with stop conditions
@@ -83,7 +88,7 @@ impl CodeGeneration {
                 options.language,
             );
 
-            for await new_text in self.imp.generate(prompt, completion_options).await {
+            for await new_text in self.imp.generate(prompt, completion_options, model_name).await {
                 let (should_stop, stop_length) = stop_condition.should_stop(&new_text);
                 text += &new_text;
                 if should_stop {

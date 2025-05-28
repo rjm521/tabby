@@ -107,8 +107,13 @@ impl CompletionServer {
 
 #[async_trait]
 impl CompletionStream for CompletionServer {
-    async fn generate(&self, prompt: &str, options: CompletionOptions) -> BoxStream<String> {
-        self.completion.generate(prompt, options).await
+    async fn generate(
+        &self,
+        prompt: &str,
+        options: CompletionOptions,
+        model_name: Option<&str>,
+    ) -> BoxStream<String> {
+        self.completion.generate(prompt, options, model_name).await
     }
 }
 

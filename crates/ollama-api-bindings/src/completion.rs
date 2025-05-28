@@ -20,14 +20,22 @@ pub struct OllamaCompletion {
 
 #[async_trait]
 impl CompletionStream for OllamaCompletion {
-    async fn generate(&self, prompt: &str, options: CompletionOptions) -> BoxStream<String> {
+    async fn generate(
+        &self,
+        prompt: &str,
+        options: CompletionOptions,
+        model_name: Option<&str>,
+    ) -> BoxStream<String> {
         // FIXME: options.presence_penalty is not used
         let ollama_options = GenerationOptions::default()
             .num_predict(options.max_decoding_tokens)
             .seed(options.seed as i32)
             .repeat_last_n(0)
             .temperature(options.sampling_temperature);
-        let request = GenerationRequest::new(self.model.to_owned(), prompt.to_owned())
+
+        let effective_model_name = model_name.unwrap_or(&self.model).to_owned();
+
+        let request = GenerationRequest::new(effective_model_name, prompt.to_owned())
             .template("{{ .Prompt }}".to_string())
             .options(ollama_options);
 

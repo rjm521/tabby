@@ -299,16 +299,18 @@ impl CompletionService {
         logger: Arc<dyn EventLogger>,
         prompt_template: Option<String>,
     ) -> Self {
+        let prompt_builder = completion_prompt::PromptBuilder::new(
+            &config.code_search_params,
+            prompt_template,
+            Some(code),
+        );
+
         Self {
-            engine,
-            prompt_builder: completion_prompt::PromptBuilder::new(
-                &config.code_search_params,
-                prompt_template,
-                Some(code),
-            ),
-            next_edit_prompt_builder: next_edit_prompt::NextEditPromptBuilder::new(),
             config,
+            engine,
             logger,
+            prompt_builder,
+            next_edit_prompt_builder: next_edit_prompt::NextEditPromptBuilder::new(),
         }
     }
 
@@ -360,13 +362,14 @@ impl CompletionService {
         request: &CompletionRequest,
         allowed_code_repository: &AllowedCodeRepository,
         user_agent: Option<&str>,
+        model_name_override: Option<&str>,
     ) -> Result<CompletionResponse, CompletionError> {
         let completion_id = format!("cmpl-{}", uuid::Uuid::new_v4());
         let language = request.language_or_unknown();
 
         if request.is_next_edit_suggestion_mode() {
             return self
-                .generate_next_edit_suggestion(request, completion_id, language, user_agent)
+                .generate_next_edit_suggestion(request, completion_id, language, user_agent, model_name_override)
                 .await;
         }
 
@@ -404,14 +407,16 @@ impl CompletionService {
             return Err(CompletionError::EmptyPrompt);
         };
 
-        let generated_text =
-            override_generated_text(self.engine.generate(&prompt, options).await, use_crlf);
+        let generated_text = override_generated_text(
+            self.engine.generate(&prompt, options, model_name_override).await,
+            use_crlf
+        );
 
         self.logger.log(
             request.user.clone(),
             Event::Completion {
                 completion_id: completion_id.clone(),
-                language,
+                language: language.clone(),
                 prompt: prompt.clone(),
                 segments: segments.cloned().map(|x| x.into()),
                 choices: vec![api::event::Choice {
@@ -444,6 +449,7 @@ impl CompletionService {
         completion_id: String,
         language: String,
         user_agent: Option<&str>,
+        model_name_override: Option<&str>,
     ) -> Result<CompletionResponse, CompletionError> {
         let segments = request
             .segments
@@ -466,7 +472,7 @@ impl CompletionService {
             request.mode.clone(),
         );
 
-        let generated_text = self.engine.generate(&prompt, options).await;
+        let generated_text = self.engine.generate(&prompt, options, model_name_override).await;
 
         self.logger.log(
             request.user.clone(),
@@ -585,12 +591,13 @@ mod tests {
 
     #[async_trait]
     impl CompletionStream for MockCompletionStream {
-        async fn generate(&self, _prompt: &str, _options: CompletionOptions) -> BoxStream<String> {
-            let s = stream! {
-                yield r#""Hello, world!""#.into();
-            };
-
-            Box::pin(s)
+        async fn generate(
+            &self,
+            _prompt: &str,
+            _options: CompletionOptions,
+            _model_name: Option<&str>,
+        ) -> BoxStream<String> {
+            futures::stream::empty().boxed()
         }
     }
 
@@ -644,7 +651,7 @@ mod tests {
 
         let allowed_code_repository = AllowedCodeRepository::default();
         let response = completion_service
-            .generate(&request, &allowed_code_repository, Some("test user agent"))
+            .generate(&request, &allowed_code_repository, Some("test user agent"), None)
             .await
             .unwrap();
         assert_eq!(response.choices[0].text, r#""Hello, world!""#);

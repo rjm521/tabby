@@ -15,6 +15,7 @@ pub use integrations::IntegrationDAO;
 pub use invitations::InvitationDAO;
 pub use job_runs::JobRunDAO;
 pub use ldap_credential::LdapCredentialDAO;
+pub use model_configuration::{AvailableModelDAO, UserModelPreferenceDAO};
 pub use notifications::NotificationDAO;
 pub use oauth_credential::OAuthCredentialDAO;
 pub use pages::{PageDAO, PageSectionDAO};
@@ -41,6 +42,7 @@ mod job_runs;
 mod ldap_credential;
 #[cfg(test)]
 mod migration_tests;
+mod model_configuration;
 mod notifications;
 mod oauth_credential;
 mod pages;

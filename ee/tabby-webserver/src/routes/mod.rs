@@ -3,6 +3,8 @@ pub mod ingestion;
 mod oauth;
 mod repositories;
 mod ui;
+pub mod ee_completions;
+pub mod ee_chat;
 
 use std::sync::Arc;
 
@@ -32,6 +34,10 @@ use crate::{
     jwt::{generate_jwt_payload, validate_jwt, generate_jwt},
     service::answer::AnswerService,
 };
+
+// Assuming StandardCompletionService is from tabby crate, aliased to avoid conflict if needed
+// use tabby::services::completion::CompletionService as StandardCompletionService;
+// use tabby::routes::chat::ChatState as StandardChatState;
 
 #[derive(Deserialize, ToSchema)]
 pub struct GetTokenRequest {
@@ -71,7 +77,7 @@ pub struct RegisterResponse {
 
 pub fn create(
     ctx: Arc<dyn ServiceLocator>,
-    api: Router,
+    mut api: Router,
     ui: Router,
     _answer: Option<Arc<AnswerService>>,
 ) -> (Router, Router) {
@@ -111,12 +117,27 @@ pub fn create(
         )
         .layer(from_fn_with_state(ctx.clone(), require_registration_token));
 
-    let api = api.route(
+    api = api.route(
         "/v1beta/server_setting",
         routing::get(server_setting).with_state(ctx.clone()),
     );
 
-    let api = api
+    // EE version overrides/adds the /v1/completions route
+    // It needs the main ServiceLocator (ctx) and the standard CompletionService as an extension.
+    // The standard CompletionService should be added as an Extension in Webserver::attach or where `api` router is built.
+    api = api.route(
+        "/v1/completions",
+        routing::post(ee_completions::ee_completions).with_state(ctx.clone())
+    );
+
+    // EE chat completions route
+    // Assumes StandardChatState is available as an Extension layer on `api` router
+    api = api.route(
+        "/v1/chat/completions",
+        routing::post(ee_chat::ee_chat_completions).with_state(ctx.clone())
+    );
+
+    api = api
         // Routes before `distributed_tabby_layer` are protected by authentication middleware for following routes:
         // 1. /v1/*
         // 2. /v1beta/*

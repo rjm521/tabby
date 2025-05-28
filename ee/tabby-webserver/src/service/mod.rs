@@ -11,6 +11,7 @@ pub mod ingestion;
 pub mod integration;
 pub mod job;
 mod license;
+pub mod model_configuration;
 mod notification;
 mod page;
 mod preset_web_documents_data;
@@ -72,6 +73,7 @@ use tabby_schema::{
     web_documents::WebDocumentService,
     worker::WorkerService,
     AsID, AsRowid, CoreError, Result, ServiceLocator,
+    model_configuration::ModelConfigurationService,
 };
 
 use self::analytic::new_analytic_service;
@@ -97,6 +99,7 @@ struct ServerContext {
     context: Arc<dyn ContextService>,
     user_group: Arc<dyn UserGroupService>,
     access_policy: Arc<dyn AccessPolicyService>,
+    model_configuration: Arc<dyn ModelConfigurationService>,
 
     logger: Arc<dyn EventLogger>,
     code: Arc<dyn CodeSearch>,
@@ -124,6 +127,7 @@ impl ServerContext {
         mail: Arc<dyn EmailService>,
         license: Arc<dyn LicenseService>,
         setting: Arc<dyn SettingService>,
+        model_configuration: Arc<dyn ModelConfigurationService>,
         db_conn: DbConn,
         embedding: Arc<dyn EmbeddingService>,
     ) -> Self {
@@ -188,6 +192,7 @@ impl ServerContext {
             user_group,
             access_policy,
             notification,
+            model_configuration,
             db_conn,
             user_rate_limiter: UserRateLimiter::default(),
         }
@@ -399,6 +404,10 @@ impl ServiceLocator for ArcServerContext {
     fn access_policy(&self) -> Arc<dyn AccessPolicyService> {
         self.0.access_policy.clone()
     }
+
+    fn model_configuration(&self) -> Arc<dyn ModelConfigurationService> {
+        self.0.model_configuration.clone()
+    }
 }
 
 pub async fn create_service_locator(
@@ -418,6 +427,7 @@ pub async fn create_service_locator(
     mail: Arc<dyn EmailService>,
     license: Arc<dyn LicenseService>,
     setting: Arc<dyn SettingService>,
+    model_configuration: Arc<dyn ModelConfigurationService>,
     db: DbConn,
     embedding: Arc<dyn EmbeddingService>,
 ) -> Arc<dyn ServiceLocator> {
@@ -439,6 +449,7 @@ pub async fn create_service_locator(
             mail,
             license,
             setting,
+            model_configuration,
             db,
             embedding,
         )
