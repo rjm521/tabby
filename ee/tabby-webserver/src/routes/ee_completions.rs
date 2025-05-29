@@ -14,19 +14,37 @@ use tabby_schema::{
 };
 use tracing::{info, warn};
 use juniper::ID;
+use utoipa::ToSchema;
 
 // 为了简化，我们暂时返回一个简单的响应类型
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, ToSchema)]
 pub struct CompletionResponse {
+    /// Response message from EE completion service
     pub message: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema)]
 pub struct CompletionRequest {
+    /// The prompt for code completion
     pub prompt: String,
+    /// Optional specific model to use for completion
     pub model: Option<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/ee/completions",
+    tag = "v1",
+    operation_id = "ee_completions",
+    request_body = CompletionRequest,
+    responses(
+        (status = 200, description = "EE Completion response", body = CompletionResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("token" = [])
+    )
+)]
 pub async fn ee_completions(
     State(locator): State<Arc<dyn ServiceLocator>>,
     Extension(_allowed_code_repository): Extension<AllowedCodeRepository>,

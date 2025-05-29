@@ -5,6 +5,7 @@ mod repositories;
 mod ui;
 pub mod ee_completions;
 pub mod ee_chat;
+pub mod model_configuration;
 
 use std::sync::Arc;
 
@@ -88,6 +89,26 @@ pub fn create(
             "/background-jobs/{id}/logs",
             routing::get(background_job_logs).with_state(ctx.job()),
         )
+        // Model Configuration API routes - these require authentication
+        .route(
+            "/v1/user/model-preference",
+            routing::get(model_configuration::get_user_model_preference)
+                .put(model_configuration::update_user_model_preference)
+                .with_state(ctx.clone())
+        )
+        .route(
+            "/v1/models",
+            routing::get(model_configuration::list_available_models)
+                .post(model_configuration::create_available_model)
+                .with_state(ctx.clone())
+        )
+        .route(
+            "/v1/models/{id}",
+            routing::get(model_configuration::get_available_model)
+                .put(model_configuration::update_available_model)
+                .delete(model_configuration::delete_available_model)
+                .with_state(ctx.clone())
+        )
         // Add other endpoints that need authentication here
         .layer(from_fn_with_state(ctx.auth(), require_login_middleware));
 
@@ -122,18 +143,18 @@ pub fn create(
         routing::get(server_setting).with_state(ctx.clone()),
     );
 
-    // EE version overrides/adds the /v1/completions route
-    // It needs the main ServiceLocator (ctx) and the standard CompletionService as an extension.
-    // The standard CompletionService should be added as an Extension in Webserver::attach or where `api` router is built.
+    // EE-specific routes on different paths to avoid conflicts with base routes
+    // These routes provide enhanced functionality for enterprise users
+
+    // EE version of completion service with user model preferences
     api = api.route(
-        "/v1/completions",
+        "/v1/ee/completions",
         routing::post(ee_completions::ee_completions).with_state(ctx.clone())
     );
 
-    // EE chat completions route
-    // Assumes StandardChatState is available as an Extension layer on `api` router
+    // EE version of chat service with user model preferences
     api = api.route(
-        "/v1/chat/completions",
+        "/v1/ee/chat/completions",
         routing::post(ee_chat::ee_chat_completions).with_state(ctx.clone())
     );
 

@@ -11,27 +11,49 @@ use tabby_schema::{
 };
 use tracing::{info, warn};
 use juniper::ID;
+use utoipa::ToSchema;
 
 // 简化的聊天请求和响应类型
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema)]
 pub struct ChatRequest {
+    /// Array of chat messages
     pub messages: Vec<ChatMessage>,
+    /// Optional specific model to use for chat
     pub model: Option<String>,
+    /// Whether to stream the response
     pub stream: Option<bool>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema)]
 pub struct ChatMessage {
+    /// Message role (user, assistant, system)
     pub role: String,
+    /// Message content
     pub content: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, ToSchema)]
 pub struct ChatResponse {
+    /// Response message from EE chat service
     pub message: String,
+    /// Model used for chat completion
     pub model_used: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/ee/chat/completions",
+    tag = "v1",
+    operation_id = "ee_chat_completions",
+    request_body = ChatRequest,
+    responses(
+        (status = 200, description = "EE Chat completion response", body = ChatResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("token" = [])
+    )
+)]
 pub async fn ee_chat_completions(
     State(locator): State<Arc<dyn ServiceLocator>>,
     TypedHeader(MaybeUser(user_jwt_sub)): TypedHeader<MaybeUser>,

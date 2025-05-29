@@ -89,6 +89,11 @@ run:
 run-index-cli:
 	$(CARGO) run --release -p tabby-index-cli
 
+# 运行企业版 tabby 服务器
+.PHONY: run-ee
+run-ee:
+	$(CARGO) run --release --features ee --bin tabby serve
+
 # 构建并运行所有测试
 .PHONY: ci
 ci: fmt-check clippy test
@@ -112,6 +117,7 @@ help:
 	@echo "  make install        - 安装依赖"
 	@echo "  make run            - 运行 tabby 服务器"
 	@echo "  make run-index-cli  - 运行 tabby-index-cli"
+	@echo "  make run-ee         - 运行企业版 tabby 服务器（带企业功能）"
 	@echo "  make ci             - 运行 CI 检查（格式、clippy、测试）"
 
 fix:
@@ -135,7 +141,7 @@ update-db-schema:
 
 dev:
 	tmuxinator start -p .tmuxinator/tabby.yml
-		
+
 bump-version:
 	cargo ws version --force "*" --no-individual-tags --allow-branch "main"
 

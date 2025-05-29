@@ -72,8 +72,8 @@ start_service() {
     print_message $BLUE "日志级别: $RUST_LOG"
     print_message $BLUE "日志文件: $LOG_FILE"
 
-    # 启动服务（使用用户提供的完整启动命令）
-    nohup env RUST_LOG=$RUST_LOG ./target/debug/tabby serve --model $MODEL --chat-model $CHAT_MODEL --device $DEVICE --port $PORT > "$LOG_FILE" 2>&1 &
+    # 启动服务（使用用户提供的完整启动命令，启用EE功能）
+    nohup env RUST_LOG=$RUST_LOG cargo run --features ee --bin tabby -- serve --model $MODEL --chat-model $CHAT_MODEL --device $DEVICE --port $PORT > "$LOG_FILE" 2>&1 &
 
     local pid=$!
     echo $pid > "$PID_FILE"
