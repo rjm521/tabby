@@ -66,8 +66,12 @@ fn main() {
 
     let out = config.build();
     let server_binary = make_output_binary(&out, "llama-server");
-
-    copy_to_output(&server_binary).expect("Failed to copy server binary to output directory");
+    if !Path::new(&server_binary).exists() {
+        panic!("llama-server二进制文件不存在，路径：{}，请检查CMake是否正确生成该文件。", server_binary);
+    }
+    if let Err(e) = copy_to_output(&server_binary) {
+        panic!("copy_to_output失败，源文件：{}，错误信息：{:?}", server_binary, e);
+    }
 }
 
 fn make_output_binary(out: &Path, name: &str) -> String {
