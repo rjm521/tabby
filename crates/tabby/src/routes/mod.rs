@@ -58,6 +58,7 @@ mod events;
 mod health;
 mod models;
 mod server_setting;
+pub mod test_agent;
 pub mod index;
 
 pub use chat::*;
@@ -66,6 +67,7 @@ pub use events::*;
 pub use health::*;
 pub use models::*;
 pub use server_setting::*;
+pub use test_agent::*;
 pub use index::*;
 
 // user routes module is not implemented; remove for now

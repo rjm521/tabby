@@ -23,7 +23,7 @@ use utoipa::{
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    routes::{self, run_app, ChatState},
+    routes::{self, run_app, ChatState, test_agent},
     services::{
         self,
         code::create_code_search,
@@ -33,6 +33,7 @@ use crate::{
         health,
         model::download_model_if_needed,
         tantivy::IndexReaderProvider,
+        test_agent::TestAgentService,
     },
     to_local_config, Device,
 };
@@ -280,108 +281,84 @@ async fn api_router(
     chat_state: Option<Arc<ChatState>>,
     webserver: Option<bool>,
 ) -> Router {
-    let mut routers = vec![];
+    let mut router = Router::new();
 
-    let health_state = Arc::new(health::HealthState::new(
-        &config.model,
-        &args.device,
-        args.chat_model
-            .as_deref()
-            .map(|_| args.chat_device.as_ref().unwrap_or(&args.device)),
-        webserver,
-    ));
+    // 添加基础路由
+    router = router
+        .route("/health", routing::get(routes::health))
+        .route("/v1/events", routing::post(routes::log_event).with_state(logger.clone()))
+        .route("/v1/setting", routing::get(routes::setting))
+        .route("/v1/index/info", routing::get(routes::index::get_index_info))
+        .route("/v1/index/documents", routing::get(routes::index::get_documents))
+        .route("/v1/index/create", routing::post(routes::index::create_index))
+        .route("/v1/index/search", routing::post(routes::index::search_code))
+        .route("/v1/index/files", routing::post(routes::index::search_files))
+        .route("/v1/index/semantic", routing::post(routes::index::semantic_search))
+        .route("/v1/index/status", routing::get(routes::index::get_index_status))
+        .route("/v1/index/delete", routing::delete(routes::index::delete_index))
+        .route("/v1/index/rebuild", routing::post(routes::index::rebuild_index))
+        .route("/v1/index/config", routing::get(routes::index::get_index_config))
+        .route("/v1/index/validate", routing::post(routes::index::validate_config))
+        .route("/v1/index/analyze", routing::post(routes::index::analyze_code))
+        .route("/v1/index/suggestions", routing::get(routes::index::get_suggestions))
+        .route("/v1/index/batch", routing::post(routes::index::batch_create_index))
+        .route("/v1/index/batch/status", routing::get(routes::index::get_batch_status));
 
-    routers.push({
-        Router::new()
-            .route(
-                "/v1/events",
-                routing::post(routes::log_event).with_state(logger),
-            )
-            .route(
-                "/v1/health",
-                routing::post(routes::health).with_state(health_state.clone()),
-            )
-            .route(
-                "/v1/health",
-                routing::get(routes::health).with_state(health_state),
-            )
-            .route("/v1beta/models", routing::get(routes::models))
-            .with_state(Arc::new(config.clone().into()))
-    });
-
-    routers.push(routes::index_router());
-
-    if let Some(completion_state) = completion_state {
-        let mut router = Router::new()
-            .route(
-                "/v1/completions",
-                routing::post(routes::completions).with_state(Arc::new(completion_state)),
-            )
-            .layer(TimeoutLayer::new(Duration::from_secs(
-                config.server.completion_timeout,
-            )));
-
-        if webserver.is_none() || webserver.is_some_and(|x| !x) {
-            router = router.layer(Extension(AllowedCodeRepository::new_from_config()));
-        }
-
-        routers.push(router);
-    } else {
-        routers.push({
-            Router::new().route(
-                "/v1/completions",
-                routing::post(StatusCode::NOT_IMPLEMENTED),
-            )
-        })
+    // 添加测试代理路由
+    if let Some(completion_service) = &completion_state {
+        let test_agent = TestAgentService::new(Arc::new(completion_service.clone()));
+        router = router.merge(test_agent::router(test_agent));
     }
 
+    // 添加健康检查路由
+    let health_state = Arc::new(health::HealthState::new(
+        config.server.model.clone(),
+        config.server.chat_model.clone(),
+    ));
+    router = router
+        .route("/v1/health", routing::get(routes::health).with_state(health_state.clone()))
+        .route("/v1/health", routing::post(routes::health).with_state(health_state));
+
+    // 添加模型路由
+    let model_info = Arc::new(routes::models::ModelInfo::from_config(config));
+    router = router.route("/v1beta/models", routing::get(routes::models).with_state(model_info));
+
+    // 添加补全路由
+    if let Some(completion_service) = completion_state {
+        router = router.route(
+            "/v1/completions",
+            routing::post(routes::completions).with_state(Arc::new(completion_service)),
+        );
+    }
+
+    // 添加聊天路由
     if let Some(chat_state) = chat_state {
-        routers.push({
-            Router::new().route(
+        router = router
+            .route(
                 "/v1/chat/completions",
                 routing::post(routes::chat_completions).with_state(chat_state.clone()),
             )
-        });
-
-        // For forward compatibility of `/v1beta` route.
-        routers.push({
-            Router::new().route(
+            .route(
                 "/v1beta/chat/completions",
                 routing::post(routes::chat_completions).with_state(chat_state),
-            )
-        });
+            );
     } else {
-        routers.push({
-            Router::new().route(
-                "/v1/chat/completions",
-                routing::post(StatusCode::NOT_IMPLEMENTED),
-            )
-        });
-
-        routers.push({
-            Router::new().route(
-                "/v1beta/chat/completions",
-                routing::post(StatusCode::NOT_IMPLEMENTED),
-            )
-        });
+        router = router
+            .route("/v1/chat/completions", routing::post(StatusCode::NOT_IMPLEMENTED))
+            .route("/v1beta/chat/completions", routing::post(StatusCode::NOT_IMPLEMENTED));
     }
 
-    let server_setting_router =
-        Router::new().route("/v1beta/server_setting", routing::get(routes::setting));
-
+    // 添加服务器设置路由
+    let server_setting_router = routes::server_setting::router();
     #[cfg(feature = "ee")]
     if args.no_webserver {
-        routers.push(server_setting_router)
+        router = router.merge(server_setting_router);
     }
 
     #[cfg(not(feature = "ee"))]
-    routers.push(server_setting_router);
+    router = router.merge(server_setting_router);
 
-    let mut root = Router::new();
-    for router in routers {
-        root = root.merge(router);
-    }
-    root
+    router
 }
 
 fn start_heartbeat(args: &ServeArgs, config: &Config, webserver: Option<bool>) {

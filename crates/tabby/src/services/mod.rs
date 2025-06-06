@@ -6,3 +6,14 @@ pub mod health;
 pub mod model;
 pub mod structured_doc;
 pub mod tantivy;
+pub mod test_agent;
+
+pub use code::*;
+pub use completion::*;
+pub use embedding::*;
+pub use event::*;
+pub use health::*;
+pub use model::*;
+pub use structured_doc::*;
+pub use tantivy::*;
+pub use test_agent::*;

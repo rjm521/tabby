@@ -1,0 +1,31 @@
+[package]
+name = "trpc-test-generator"
+version = "0.1.0"
+edition = "2021"
+description = "AI-powered test generation tool for tRPC-Go projects"
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+regex = { workspace = true }
+thiserror = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+futures = { workspace = true }
+
+# AI inference dependencies
+tabby-inference = { path = "../tabby-inference" }
+tabby-common = { path = "../tabby-common" }
+
+# rig framework for LLM interaction (暂时注释，需要确认版本)
+# rig-core = "0.3"
+
+# Additional dependencies for Go code analysis
+# tree-sitter = "0.22.6"  # 暂时注释，避免版本冲突
+# tree-sitter-go = "0.21"
+walkdir = "2.5"
